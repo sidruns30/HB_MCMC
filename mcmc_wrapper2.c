@@ -138,9 +138,9 @@ int main(int argc, char* argv[])
   int *index, burn_in;
   bounds limited[Nparams], limits[Nparams];
   FILE *param_file, *data_file, *chain_file, *logL_file;
-  char pfname[80],dfname[80],parname[80],subparname[80],
-    outname[80],chainname[80],logLname[80];
-  char RUN_ID[11];
+  char pfname[80]="",dfname[80]="",parname[80]="",subparname[80]="",
+    outname[80]="",chainname[80]="",logLname[80]="";
+  char RUN_ID[11]="";
   //characteristic magnitude of MCMC step in each parameter
   double  *sigma;
 
@@ -148,7 +148,6 @@ int main(int argc, char* argv[])
   strcpy(RUN_ID,argv[2]);
   true_err = (double)atof(argv[3]);
   burn_in = atoi(argv[4]);
-
   strcat(subparname,"subpar.");
   strcat(subparname,RUN_ID);
   strcat(subparname,".dat");
@@ -167,6 +166,8 @@ int main(int argc, char* argv[])
   P_ = (double **)malloc(Nchains*sizeof(double));
   for(i=0;i<Nchains;i++) P_[i]=(double *)malloc(Nparams*sizeof(double));
   x = (double **)malloc(Nchains*sizeof(double));
+  int size_of_x = Nchains*sizeof(double);
+  printf("size of x is: %i \n", size_of_x);
   for(i=0;i<Nchains;i++) x[i]=(double *)malloc(Nparams*sizeof(double));
   
   history = (double ***)malloc(Nchains*sizeof(double));
@@ -192,7 +193,7 @@ int main(int argc, char* argv[])
   //read in starting parameters near best solution
 
   param_file = fopen(parname,"r");
-  printf("%s\n",parname);
+  printf("Parameter file: %s\n",parname);
   //initialize priors
   set_limits(limited,limits);
   
@@ -213,6 +214,7 @@ int main(int argc, char* argv[])
     for(j=1; j<Nchains; j++) {
       P_[j][i]   = P_[0][i];
       x[j][i]  = P_[0][i];
+      printf("Values of parameters in chains are: %lf \n", x[j][i]);
     }
     if (burn_in == 1) {
       for(j=0; j<Nchains; j++) {
@@ -225,15 +227,15 @@ int main(int argc, char* argv[])
 	P_[j][i]   = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
 	if (i == 2) P_[j][i] = P_0[i];
 	x[j][i]  = P_[j][i];
+
       }
     }
-    printf("%12.5e\n",tmp);
   }
   fclose(param_file);
 
   //read data file
   data_file = fopen(dfname,"r");
-  printf("%s\n",dfname);
+  printf("Reading data file: %s\n",dfname);
   tmp = 0;
   fscanf(data_file,"%ld\n", &Nt);
   printf("%ld\n",Nt);
@@ -298,24 +300,44 @@ int main(int argc, char* argv[])
   int jump;
   double jscale;
   for (iter=0;iter<Niter;iter++) {
+    printf("iteration: %d of %d \n", iter,Niter);
     //simulated annealing
     //for(j=0; j<Nchains; j++) heat[j]=(1.0);// + 100000.0*exp(-(double)iter/1000.0));
     
     //loop over chains
     for(j=0; j<Nchains; j++) {
+      printf("chain iteration: %d of %d \n", j,Nchains);
       alpha = ran2(&seed);
       //jscale = pow(10.,-8.+6.*alpha);
       jscale = pow(10.,-6.+6.*alpha);
       /* propose new solution */
       jump=0;
-      if(ran2(&seed)<0.5 && iter>Npast) jump=1;
+      if(ran2(&seed)<0.5 && iter>Npast) {jump=1;
+      printf("Another check \n");}
       //gaussian jumps along parameter directions
       if(jump==0)
+        //printf("Value of x is %p \n", x[index[j]]);
+        printf("The index is %d \n", index[j]);
+        printf("Value of seed is %p \n", &seed);
+        printf("Value of sigma is %p \n", sigma);
+        printf("Value of jscale is %d \n", jscale);
+        printf("Value of temp is %d \n", temp[j]);
+        printf("Value of y is %p \n", y);{
+        printf("Another gaussian check \n");
+        printf("Value of x is %p \n", x[index[j]]);
+        printf("Value of seed is %p \n", &seed);
+        printf("Value of sigma is %p \n", sigma);
+        printf("Value of jscale is %d \n", jscale);
+        printf("Value of temp is %d \n", temp[j]);
+        printf("Value of y is %p \n", y);
+
 	gaussian_proposal(x[index[j]], &seed, sigma, jscale, temp[j], y);
+  printf("Another gaussian check #2 \n");}
       //uniform draw on priors
       //uniform_proposal(x[index[j]], &seed, limits, y);
       
       //jump along correlations derived from chain history
+      printf("Check 1 \n");
       if(jump==1) {
 	if(index[j]==0)DEtrial++;
 	differential_evolution_proposal(x[index[j]], &seed, history[j], y);
@@ -328,7 +350,7 @@ int main(int argc, char* argv[])
       }
       
       for (i=0;i<Nparams;i++) {
-	
+	printf("Check 2\n");
 	//enforce priors (reflecting boundary conditions)
 	if ((limited[i].lo == 1)&&(y[i] < limits[i].lo)) 
 	  y[i] = 2.0*limits[i].lo - y[i];
@@ -351,7 +373,7 @@ int main(int argc, char* argv[])
       
       //acceptance probability
       alpha = ran2(&seed);
-      //printf("%d %d %12.5e %12.5e\n",j,index[j],logLy,logLx[index[j]]);
+      printf("%d %d %12.5e %12.5e\n",j,index[j],logLy,logLx[index[j]]);
       //conditional acceptance of y
       if (alpha <= H)  {
 	if(index[j]==0)acc++;
@@ -579,12 +601,13 @@ void uniform_proposal(double *x, long *seed, bounds limits[], double *y)
 
 void gaussian_proposal(double *x, long *seed, double *sigma, double scale, double temp, double *y)
 {
+  printf("Calling Gaussian temp = %d \n", temp);
 	int n;
 	double gamma;
 	double sqtemp;
 	double dx[Nparams];
 	
-	
+	printf("Calling Gaussian temp = %d \n", temp);
 	//scale jumps by temperature
 	sqtemp = sqrt(temp);
 	
@@ -594,6 +617,7 @@ void gaussian_proposal(double *x, long *seed, double *sigma, double scale, doubl
 	//jump in parameter directions scaled by dx
 	for(n=0; n<Nparams; n++) {
 	  y[n] = x[n] + dx[n];
+    
 	  //printf("%12.5e %12.5e %12.5e %12.5e %12.5e\n",
 	  //	 scale,sqtemp,sigma[n],x[n],dx[n]);
 	}
