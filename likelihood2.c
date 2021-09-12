@@ -1,5 +1,5 @@
 /*********************************************************/
-//similar to likelihood.c, but with independently varying R1,R2
+//similar to likelihood.C, but with independently varying R1,R2
 //instead of using main sequence scaling relations
 /*********************************************************/
 #include <math.h>
@@ -7,34 +7,40 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define pi 3.14159265358979323846
+#define PI 3.14159265358979323846
 #define G 6.6743e-8 //cgs
-#define c 2.998e10
+#define C 2.998e10
 #define AU 1.496e13
-#define Msun 1.9885e33
-#define Rsun 6.955e10
-#define sec_day 86400.0
+#define MSUN 1.9885e33
+#define RSUN 6.955e10
+#define SEC_DAY 86400.0
+
+/*Siddhant: Static inline functions help with speed*/
+static inline void swap(double *x, double *y){
+  double temp = *x;
+  *x = *y;
+  *y = temp;
+}
 
 /*********************************************************/
 double A_rh(double R, double h)
 {
-  double area;
-  area = R*R*asin(h/R)-h*sqrt(R*R-h*h);
-  return area;
+  /*Commented stuff with extra overhead*/
+  //double area;
+  //area = R*R*asin(h/R)-h*sqrt(R*R-h*h);
+  //return area;
+  return R*R*asin(h/R)-h*sqrt(R*R-h*h);
 }
 /*********************************************************/
 double overlap(double r1, double r2, double d)
 {
   double h,r,dc,area;
-  if (r2 > r1) {
-    r = r1;
-    r1 = r2;
-    r2 = r;
-  }
+  if (r2 > r1) swap(&r1, &r2);
   d = fabs(d);
-  if (d > (r1+r2)) area = 0.;
-  if (d < (r1-r2)) area = pi*r2*r2;
+  if (d >= (r1+r2)) area = 0.;
+  else if (d < (r1-r2)) area = PI*r2*r2;
   dc = sqrt(r1*r1-r2*r2);
+  /*Siddhant: Are we covering all test cases? What if d>dc and d>(r1+r2)?*/
   if ((d > dc)&(d < (r1+r2))) {
     h = sqrt((4.*d*d*r1*r1-pow((d*d-r2*r2+r1*r1),2.))/(4.*d*d));
     area = A_rh(r1,h)+A_rh(r2,h);
@@ -42,7 +48,7 @@ double overlap(double r1, double r2, double d)
   if ((d <= dc)&(d >= (r1-r2))) {
     //     d = dc+(d-r2)
     h = sqrt((4.*d*d*r1*r1-pow((d*d-r2*r2+r1*r1),2.))/(4.*d*d));    
-    area = pi*r2*r2-(A_rh(r2,h)-A_rh(r1,h));
+    area = PI*r2*r2-(A_rh(r2,h)-A_rh(r1,h));
   }
   return area;
 }
@@ -55,21 +61,21 @@ void traj(double t, double pars[], double pos[],
   int i;
   double P,M1,M2,a,e,inc,Omega,omega0,T0;
   double Mtot,r,f;
-  t = t*sec_day;
-  M1 = pow(10.,pars[0])*Msun;
-  M2 = pow(10.,pars[1])*Msun;
-  P = pow(10.,pars[2])*sec_day;
+  t = t*SEC_DAY;
+  M1 = pow(10.,pars[0])*MSUN;
+  M2 = pow(10.,pars[1])*MSUN;
+  P = pow(10.,pars[2])*SEC_DAY;
   e = pars[3];
-  inc = pars[4]*(pi/180.);
-  Omega = pars[5]*(pi/180.);
-  omega0 = pars[6]*(pi/180.);
-  T0 = pars[7]*sec_day;
+  inc = pars[4]*(PI/180.);
+  Omega = pars[5]*(PI/180.);
+  omega0 = pars[6]*(PI/180.);
+  T0 = pars[7]*SEC_DAY;
   Mtot = M1+M2;
-  a = pow(G*Mtot*P*P/(4.0*pi*pi),1./3.);
-  //P = sqrt(4.0*pi*pi*a*a*a/(G*Mtot));
+  a = pow(G*Mtot*P*P/(4.0*PI*PI),1./3.);
+  //P = sqrt(4.0*PI*PI*a*a*a/(G*Mtot));
   
-  double M = 2.*pi * (t-T0)/P; 
-  M = fmod(M,2*pi);
+  double M = 2.*PI * (t-T0)/P; 
+  M = fmod(M,2*PI);
   double EE = M;
   if(sin(M) != 0.0){ 
   	 EE = M + 0.85*e*sin(M)/fabs(sin(M));
@@ -92,10 +98,10 @@ void traj(double t, double pars[], double pos[],
   pos[5] = -ZZ*(M1/Mtot);
   
   //printf("t,T0,EE,a,zdot: %g,%g,%g,%g,%g\n",t,P,EE,a,*zdot);
-  *rE = sqrt(4.*G*M1/(c*c)*fabs(ZZ)); //approx D_L = D_S
+  *rE = sqrt(4.*G*M1/(C*C)*fabs(ZZ)); //approx D_L = D_S
   //printf("%12.5e %12.5e %12.5e %12.5e %12.5e\n",G,M1,ZZ,a,r);
   //theta = acos(sin(ff+omega0)*sin(inc));
-  *theta = omega0+f-pi/2.;
+  *theta = omega0+f-PI/2.;
   *rr = r;
   *ff = f;
 }
@@ -107,8 +113,8 @@ void traj(double t, double pars[], double pos[],
 void calc_light_curve(double *times, long Nt, double *pars, double *template)
 {
   //times: input array of time sample points
-  double R1 = 1.0; //units of Rsun
-  double R2 = 1.0; //units of Rsun
+  double R1 = 1.0; //units of RSUN
+  double R2 = 1.0; //units of RSUN
   double Teff1 = 1.0; //units of Tsun
   double Teff2 = 1.0; //units of Tsun
   double Flux1 = 1.0; //units of Fsun
@@ -133,20 +139,20 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
 
   M1 = pow(10.,pars[0]);
   M2 = pow(10.,pars[1]);
-  P = pow(10.,pars[2])*sec_day;
+  P = pow(10.,pars[2])*SEC_DAY;
   e = pars[3];
-  inc = pars[4]*(pi/180.);
-  Omega = pars[5]*(pi/180.);
-  omega0 = pars[6]*(pi/180.);
-  T0 = pars[7]*sec_day;
+  inc = pars[4]*(PI/180.);
+  Omega = pars[5]*(PI/180.);
+  omega0 = pars[6]*(PI/180.);
+  T0 = pars[7]*SEC_DAY;
   Flux_TESS = pars[8];
   Flux_TESS = pow(10.,Flux_TESS);
   rr1 = pow(10.,pars[9]);
   rr2 = pow(10.,pars[10]);
-  Mtot = (M1+M2)*Msun;
-  a = pow(G*Mtot*P*P/(4.0*pi*pi),1./3.);
-  //P = sqrt(4.0*pi*pi*a*a*a/(G*Mtot));
-  Pdays = P/sec_day;
+  Mtot = (M1+M2)*MSUN;
+  a = pow(G*Mtot*P*P/(4.0*PI*PI),1./3.);
+  //P = sqrt(4.0*PI*PI*a*a*a/(G*Mtot));
+  Pdays = P/SEC_DAY;
   //printf("%12.5e %12.5e %12.5e\n",a,P,Pdays);
   R1 = 0.0;
   Teff1 = 0.0;
@@ -167,19 +173,19 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
   Teff1 = pow(10.,Teff1)/5580.;
   Teff2 = pow(10.,Teff2)/5580.;
 
-  Flux1 = pi*R1*R1*pow(Teff1,4.);
-  Flux2 = pi*R2*R2*pow(Teff2,4.);
+  Flux1 = PI*R1*R1*pow(Teff1,4.);
+  Flux2 = PI*R2*R2*pow(Teff2,4.);
   for (itime=0; itime<Nt; itime++){
     t=times[itime];
     traj(t,pars,pos,&zdot,&rE,&theta,&rr,&ff);
-    rr = rr/Rsun; //units of Rsun
-    //projected separation in units of Rsun
-    d = sqrt((pos[3]-pos[0])*(pos[3]-pos[0])+(pos[4]-pos[1])*(pos[4]-pos[1]))/Rsun;
+    rr = rr/RSUN; //units of RSUN
+    //projected separation in units of RSUN
+    d = sqrt((pos[3]-pos[0])*(pos[3]-pos[0])+(pos[4]-pos[1])*(pos[4]-pos[1]))/RSUN;
     Amag_limb=1.;
 
     //convert back to Agnieszka units
     Mtot = M1+M2;
-    aR = a/Rsun;
+    aR = a/RSUN;
     Adoppler = 2.8e-3*alphabeam*sin(inc)*pow(Pdays,-1./3)*pow(Mtot,-2./3.)*M1*zdot;
     Aellipse_phi = -alphaev*(M1/M2)*sin(inc)*sin(inc)*cos(2.*theta)*R2*R2*R2/(rr*rr*rr);
     Am = (1./9.)*alphaev*(2.+5.*M1/M2)*(2.-3.*sin(inc)*sin(inc))*R2*R2*R2/(aR*aR*aR);
