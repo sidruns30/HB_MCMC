@@ -1,4 +1,6 @@
 #ignore all files
+**/job_outputs
+submit_job*
 .vscode
 **/extra
 **/figures
