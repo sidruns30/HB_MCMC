@@ -183,6 +183,7 @@ int main(int argc, char* argv[])
   y = (double *)malloc(NPARAMS*sizeof(double));
   sigma = (double *)malloc(NPARAMS*sizeof(double));
   scale  = 1.0/((double)(NPARAMS));
+  //
 
   //true_err = 1.0;
   srand(Niter);
@@ -206,18 +207,17 @@ int main(int argc, char* argv[])
       P_[j][i] = P_[0][i];
       x[j][i]  = P_[0][i];
     }
-    /* Siddhant: what are the 'burn_in' flags for*/
     if (burn_in == 1) {
       for(j=0; j<NCHAINS; j++) {
 	      P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
 	      x[j][i]  = P_[j][i];
       }
     }
-    /* Siddhant: why can't this be combined with the above loop? */
+
     if (burn_in == 2) {
       for(j=0; j<NCHAINS; j++) {
 	      P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
-	      if (i == 2) P_[j][i] = P_0[i];
+	      if (i == 2) P_[j][i] = P_0[i];  // Keep the period
 	      x[j][i]  = P_[j][i];
       }
     }
@@ -274,7 +274,7 @@ int main(int argc, char* argv[])
   temp[0] = 1.0;
   index[0] = 0;
   
-  for(int i=1; i<NCHAINS; i++) {
+  for(i=1; i<NCHAINS; i++) {
     temp[i]  = temp[i-1]*dtemp;
     index[i] = i;
   }
@@ -300,7 +300,7 @@ int main(int argc, char* argv[])
   for (iter=0; iter<Niter; iter++) {
     printf("iteration: %d of %d \n", iter,Niter);
     //loop over chains
-    for(int j=0; j<NCHAINS; j++) {
+    for(j=0; j<NCHAINS; j++) {
       alpha = ran2(&seed);
       jscale = pow(10.,-6.+6.*alpha);
       /* propose new solution */
