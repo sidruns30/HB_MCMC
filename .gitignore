@@ -1,4 +1,7 @@
 #ignore all files
+lombscargle.py
+*.exe
+C_python*
 **/job_outputs
 submit_job*
 .vscode
