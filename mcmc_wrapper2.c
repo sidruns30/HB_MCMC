@@ -98,7 +98,26 @@ void set_limits(bounds limited[], bounds limits[])
   limits[10].hi = 2.0;
 }
 
-int main(int argc, char* argv[])
+/* Siddhant: Functions to free memory from arrays */
+void free_1d(double *arr){
+  free(arr);
+}
+
+void free_2d(double **arr, int size){
+  for (int i=0;i<size;i++){free(arr[i]);}
+  free(arr);
+}
+
+void free_3d(double ***arr, int size1, int size2){
+  for (int i=0;i<size1;i++){
+    for (int j=0;j<size2;j++){free(arr[i][j]);}
+    free(arr[i]);
+  }
+  free(arr);
+}
+
+int main(int
+ argc, char* argv[])
 {
   /* Siddhant: Adding small variable descriptions */
   long Niter;                     // Chain iterations
@@ -235,7 +254,7 @@ int main(int argc, char* argv[])
   subN         = 0;
   rdata        = (double *)malloc(4*Nt*sizeof(double));
   index        = (int *)malloc(NCHAINS*sizeof(int));
-  
+
   for (i=0;i<Nt;i++) {
     fscanf(data_file,"%lf %lf %lf %lf\n", &tmp1, &tmp2, &tmp3, &tmp4);
     rdata[i*4]=tmp1;
@@ -441,6 +460,22 @@ int main(int argc, char* argv[])
   fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
 	x[index[0]][5],x[index[0]][6],x[index[0]][7],x[index[0]][8],x[index[0]][9],x[index[0]][10]);
   fclose(param_file);
+
+  // Free the memory from arrays
+  free_2d(P_, NCHAINS);
+  free_2d(x, NCHAINS);
+  free_3d(history, NCHAINS, NPAST);
+  free_1d(y);
+  free_1d(sigma);
+  free_1d(rdata);
+  free(index);
+  free_1d(a_data);
+  free_1d(a_model);
+  free_1d(t_data);
+  free_1d(e_data);
+  free_1d(q_data);
+  free_1d(light_curve);
+  free_1d(light_curve2);
   return(0);
 }
 
