@@ -37,8 +37,7 @@ void hypercube_proposal(double *x, long *seed, double *y);
 void differential_evolution_proposal(double *x, long *seed, double **history, double *y);
 
 /* Set priors on parameters, and whether or not each parameter is bounded*/
-/* Siddhant: What are the 'limited' structs doing here? */
-/* Siddhant: Can be coded better if this is just a BC thing*/
+/* Siddhant: Maybe just use an if condition/switch statment instead of limited*/
 void set_limits(bounds limited[], bounds limits[])
 {
   //limits on M1, in log10 MSUN
@@ -121,39 +120,39 @@ int main(int
 {
   /* Siddhant: Adding small variable descriptions */
   long Niter;                     // Chain iterations
-  double **P_;                    // ?
-  double P_0[NPARAMS];            //
-  double *y;                      // Updated Posterior (?)
-  double **x;                     // Posterior parameter chains
+  double **P_;                    // Contains parameters - check why different from x - seems uneccessary
+  double P_0[NPARAMS];            
+  double *y;                      // Updated Parameter
+  double **x;                     // Parameter chains
   double ***history;              // Chain history
-  double xmap[NPARAMS];           // ?
+  double xmap[NPARAMS];           // Contains the chain with best paramters
   double dx[NPARAMS];             // Parameter step
-  double dx_mag;                  // Mag of above
-  double alpha;                   // ?
+  double dx_mag;                  
+  double alpha;                   // Random number stuff
   double logLx[NCHAINS];          // Log likelihood for all chains
-  double logLmap;                 // ?
-  double logLy;                   // Likelihood for new step (?)
+  double logLmap;                 
+  double logLy;                   // Likelihood for new step
   double tmp,tmp1,tmp2,tmp3,tmp4;
-  double Tmin;                    // Minimum temperature
-  double t_range[2];              //
-  double true_err,Nerr,suberr;    // 
-  double scale;                   //
-  double dtemp;                   //
-  double heat[NCHAINS],temp[NCHAINS]; // More PTMCMC stuff
-  double H;                       // ?
-  double *rdata;                  // 
-  double *a_data,*a_model,*e_data,*t_data,*q_data;  // ?
-  double *light_curve;            //
-  double *light_curve2;           //
-  long i,j,k,m,subi;              //
-  long Nt,Nstart,Nstop,subN,obs_id,nch; // Num points, ?
-  long acc;                       //
-  long iter,TICid;                //
-  int *index, burn_in;            //
-  /* Siddhant: These are set soon but still maybe add a constructor? */
+  //double Tmin;                    // Never used!
+  //double t_range[2];              // Never used!
+  double true_err,Nerr,suberr;    // True error contains error on each LC point; others not used
+  double scale;                   
+  double dtemp;                   // Ask Jeremy
+  double heat[NCHAINS],temp[NCHAINS]; // More PTMCMC stuff - heat never used
+  double H;                       // Hasting's ratio
+  double *rdata;                  
+  double *a_data,*a_model,*e_data,*t_data,*q_data;
+  double *light_curve;            
+  double *light_curve2;           
+  long i,j,k,m,subi;              
+  long Nt,Nstart,Nstop,subN,obs_id,nch;
+  long acc;                       
+  long iter,TICid;                
+  int *index, burn_in;            
+
   bounds limited[NPARAMS], limits[NPARAMS];
   FILE *param_file, *data_file, *chain_file, *logL_file;
-  /* Siddhant: Initializing empty arrays help with mem leaks*/
+  /* Siddhant: Initializing empty arrays help avoid memory leaks*/
   char  pfname[80]="", dfname[80]="",  parname[80]="",
         subparname[80]="",  outname[80]="", chainname[80]="",
         logLname[80]="", RUN_ID[11]="";
@@ -185,8 +184,6 @@ int main(int
   strcat(dfname,".txt");            // complete data set
   //strcat(dfname,".bin");          // binned data
 
-  /* Siddhant: All the memory allocation can be hidden behind a wrapper 
-      function, would look better and will be safer*/
   P_ = (double **)malloc(NCHAINS*sizeof(double));
   for(i=0;i<NCHAINS;i++) P_[i]=(double *)malloc(NPARAMS*sizeof(double));
   
@@ -214,7 +211,7 @@ int main(int
   set_limits(limited,limits);
   //set up proposal distribution
   initialize_proposals(sigma, history);
-  /* Siddhant: Initializing the chain? What is **P - list of parameters*/
+  /* Siddhant: Initializing the chain parameters*/
   for (i=0;i<NPARAMS;i++) {
     fscanf(param_file,"%lf\n", &tmp);
     P_[0][i] = tmp;
@@ -247,10 +244,7 @@ int main(int
   data_file = fopen(dfname,"r");
   tmp = 0;
   fscanf(data_file,"%ld\n", &Nt);
-  /* Siddhant: what is sub N, what is the need for rdata array
-      if everything is later copied to different arrays, seems a
-      little redundant, assignment to and from rdata is also a bit
-      sketchy */
+
   subN         = 0;
   rdata        = (double *)malloc(4*Nt*sizeof(double));
   index        = (int *)malloc(NCHAINS*sizeof(int));
@@ -265,7 +259,6 @@ int main(int
   }
   fclose(data_file);
 
-  /* Siddhant: are these flux, time, errors or something else?*/
   a_data       = (double *)malloc(subN*sizeof(double));
   a_model      = (double *)malloc(subN*sizeof(double));
   t_data       = (double *)malloc(subN*sizeof(double));
@@ -307,7 +300,7 @@ int main(int
   acc=0;
   chain_file = fopen(chainname,"w");
   logL_file  = fopen(logLname,"w");
-  /* Siddhant: Not sure what these variables are...*/
+
   int atrial=0;
   int DEtrial=0;
   int DEacc=0;
@@ -315,7 +308,7 @@ int main(int
   double jscale;
   // Begind loop timer
   clock_t begin = clock();
-  /* Siddhant: Main MCMC Loop*/
+  /* Main MCMC Loop*/
   for (iter=0; iter<Niter; iter++) {
     printf("iteration: %d of %d \n", iter,Niter);
     //loop over chains
@@ -324,10 +317,9 @@ int main(int
       jscale = pow(10.,-6.+6.*alpha);
       /* propose new solution */
       jump=0;
-      /* Siddhant: I don't understand what's happening here */
+      /* DE proposal; happens after 500 cycles */
       if(ran2(&seed)<0.5 && iter>NPAST) {jump=1;}
       
-      /* Siddhant: code below sets new parameter direction*/
       //gaussian jumps along parameter directions
       if(jump==0){gaussian_proposal(x[index[j]], &seed, sigma, jscale, temp[j], y);}
       //jump along correlations derived from chain history
@@ -342,7 +334,6 @@ int main(int
 	        gaussian_proposal(x[index[j]], &seed, sigma, jscale, temp[j], y);
       }
 
-      /* Siddhant: code below sets boundary conditions on parameters*/
       for (i=0;i<NPARAMS;i++) {
 	      //enforce priors (reflecting boundary conditions)
 	      if ((limited[i].lo == 1)&&(y[i] < limits[i].lo))
@@ -356,7 +347,6 @@ int main(int
 	        y[i] = limits[i].lo + (y[i]-limits[i].hi);
       }
 
-      /* Siddhant: Are we comparing old and new likelihoods?*/
       //compute trial signal
       logLx[index[j]] = loglikelihood(t_data,a_data,e_data,subN,x[index[j]]);
       logLy = loglikelihood(t_data,a_data,e_data,subN,y);
@@ -392,10 +382,6 @@ int main(int
       }
     
     /********Chain Loop ends**********/
-    /* Siddhant: Checking if the chain shuffles*/
-    // printf("Chain (%d): \n",iter);
-    // for (int j=0;j<NCHAINS;j++) {printf("%ld, ",index[j]);}
-
     //update map parameters
     if (logLx[index[0]] > logLmap) {
       for (i=0;i<NPARAMS;i++) {
@@ -468,7 +454,7 @@ int main(int
   free_1d(y);
   free_1d(sigma);
   free_1d(rdata);
-  free(index);
+  free_1d(index);
   free_1d(a_data);
   free_1d(a_model);
   free_1d(t_data);
