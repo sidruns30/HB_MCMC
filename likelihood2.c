@@ -15,7 +15,6 @@
 #define RSUN 6.955e10
 #define SEC_DAY 86400.0
 
-/*Siddhant: Static inline functions help with speed*/
 static inline void swap(double *x, double *y){
   double temp = *x;
   *x = *y;
