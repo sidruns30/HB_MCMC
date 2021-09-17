@@ -454,7 +454,7 @@ int main(int
   free_1d(y);
   free_1d(sigma);
   free_1d(rdata);
-  free_1d(index);
+  free(index);
   free_1d(a_data);
   free_1d(a_model);
   free_1d(t_data);
