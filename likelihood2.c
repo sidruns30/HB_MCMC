@@ -14,6 +14,8 @@
 #define MSUN 1.9885e33
 #define RSUN 6.955e10
 #define SEC_DAY 86400.0
+#define SQR(x) (x*x)
+#define QUAD(x) (x*x*x*x)
 
 static inline void swap(double *x, double *y){
   double temp = *x;
@@ -33,22 +35,17 @@ double A_rh(double R, double h)
 /*********************************************************/
 double overlap(double r1, double r2, double d)
 {
-  double h,r,dc,area;
+  double h,r,dc,area,h_sq;
   if (r2 > r1) swap(&r1, &r2);
   d = fabs(d);
   if (d >= (r1+r2)) area = 0.;
   else if (d < (r1-r2)) area = PI*r2*r2;
   dc = sqrt(r1*r1-r2*r2);
-  /*Siddhant: Are we covering all test cases? What if d>dc and d>(r1+r2)?*/
-  if ((d > dc)&(d < (r1+r2))) {
-    h = sqrt((4.*d*d*r1*r1-pow((d*d-r2*r2+r1*r1),2.))/(4.*d*d));
-    area = A_rh(r1,h)+A_rh(r2,h);
-  }
-  if ((d <= dc)&(d >= (r1-r2))) {
-    //     d = dc+(d-r2)
-    h = sqrt((4.*d*d*r1*r1-pow((d*d-r2*r2+r1*r1),2.))/(4.*d*d));    
-    area = PI*r2*r2-(A_rh(r2,h)-A_rh(r1,h));
-  }
+  h_sq = (4.*d*d*r1*r1- SQR(d*d-r2*r2+r1*r1))
+          /(4.*d*d);
+  h = sqrt(h);
+  if ((d > dc)&(d < (r1+r2))) { area = A_rh(r1,h)+A_rh(r2,h);}
+  if ((d <= dc)&(d >= (r1-r2))) { area = PI*r2*r2-(A_rh(r2,h)-A_rh(r1,h));}
   return area;
 }
 
@@ -72,10 +69,15 @@ void traj(double t, double pars[], double pos[],
   Mtot = M1+M2;
   a = pow(G*Mtot*P*P/(4.0*PI*PI),1./3.);
   //P = sqrt(4.0*PI*PI*a*a*a/(G*Mtot));
-  
+
+  // Check per likelihood time evaluation
+  // Get rid of extra data in folded lc
+  // Change parameters in lc
+  // Fit a model and remove high std dev points
   double M = 2.*PI * (t-T0)/P; 
   M = fmod(M,2*PI);
   double EE = M;
+
   if(sin(M) != 0.0){ 
   	 EE = M + 0.85*e*sin(M)/fabs(sin(M));
   }
@@ -85,10 +87,19 @@ void traj(double t, double pars[], double pos[],
   r = a*(1-e*cos(EE));
   f = 2.*atan(sqrt((1.+e)/(1.-e))*tan(EE/2.));
 
-  double XX = r*(cos(Omega)*cos(omega0+f)-sin(Omega)*sin(omega0+f)*cos(inc));
-  double YY = r*(sin(Omega)*cos(omega0+f)+cos(Omega)*sin(omega0+f)*cos(inc));
-  double ZZ = r*sin(omega0+f)*sin(inc);
-  *zdot = 1./(sqrt(1-e*e))*(cos(omega0+f)+e*cos(omega0));
+  double cos_Omega = cos(Omega);
+  double cos_omega0_f = cos(omega0+f);
+  double sin_Omega = sin(Omega);
+  double sin_omega0_f = sin(omega0+f);
+  double cos_inc = cos(inc);
+  double sin_inc = sin(inc);
+  double cos_omega0 = cos(omega0);
+
+  double XX = r*(cos_Omega*cos_omega0_f - sin_Omega*sin_omega0_f*cos_inc);
+  double YY = r*(sin_Omega*cos_omega0_f + cos_Omega*sin_omega0_f*cos_inc);
+  double ZZ = r*sin_omega0_f*sin_inc;
+
+  *zdot = 1./(sqrt(1-e*e))*(cos_omega0_f + e*cos_omega0);
   pos[0] = XX*(M2/Mtot);
   pos[1] = YY*(M2/Mtot);
   pos[2] = ZZ*(M2/Mtot);
