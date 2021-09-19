@@ -149,7 +149,6 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
   double Rcoeff[] = {0.00158766,0.921233,-0.155659,-0.0739842,0.0581150};
   int j,itime=0;
 
-  /*Siddhant: can we eliminate some of these exponentiations*/
   // This removes 4 log10 calls:
   double logM1 = pars[0];
   double logM2 = pars[1]; 

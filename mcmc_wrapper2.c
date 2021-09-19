@@ -306,11 +306,13 @@ int main(int
   int DEacc=0;
   int jump;
   double jscale;
-  // Begind loop timer
-  clock_t begin = clock();
+  
+  clock_t begin, end;
   /* Main MCMC Loop*/
   for (iter=0; iter<Niter; iter++) {
-    printf("iteration: %d of %d \n", iter,Niter);
+    
+    if(iter % 10 == 0) {begin = clock();}
+    
     //loop over chains
     for(j=0; j<NCHAINS; j++) {
       alpha = ran2(&seed);
@@ -374,13 +376,14 @@ int main(int
       k = iter - (iter/NPAST)*NPAST;
       for(i=0; i<NPARAMS; i++) history[j][k][i] = x[index[j]][i];
     }
+
     // Call timer after 10 iterations
-    if (iter == 10){
-      clock_t end = clock();
+    if (iter%10 == 9){
+      end = clock();
       double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-      printf("Time spent after 10 iterations: %lf", time_spent);
+      printf("time spent in the last 10 iterations: %f \n", time_spent);
       }
-    
+
     /********Chain Loop ends**********/
     //update map parameters
     if (logLx[index[0]] > logLmap) {
