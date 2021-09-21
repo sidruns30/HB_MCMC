@@ -36,6 +36,10 @@ void gaussian_proposal(double *x, long *seed, double *sigma, double scale, doubl
 void hypercube_proposal(double *x, long *seed, double *y);
 void differential_evolution_proposal(double *x, long *seed, double **history, double *y);
 
+// CHeck diff runs
+// Adds John's version
+// Fold on lc
+// Profiler
 /* Set priors on parameters, and whether or not each parameter is bounded*/
 /* Siddhant: Maybe just use an if condition/switch statment instead of limited*/
 void set_limits(bounds limited[], bounds limits[])
@@ -313,15 +317,15 @@ int main(int
     
     if(iter % 10 == 0) {begin = clock();}
     
+    alpha = ran2(&seed);  
+    jscale = pow(10.,-6.+6.*alpha);
+
     //loop over chains
     for(j=0; j<NCHAINS; j++) {
-      alpha = ran2(&seed);
-      jscale = pow(10.,-6.+6.*alpha);
       /* propose new solution */
       jump=0;
       /* DE proposal; happens after 500 cycles */
       if(ran2(&seed)<0.5 && iter>NPAST) {jump=1;}
-      
       //gaussian jumps along parameter directions
       if(jump==0){gaussian_proposal(x[index[j]], &seed, sigma, jscale, temp[j], y);}
       //jump along correlations derived from chain history
