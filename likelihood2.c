@@ -157,10 +157,10 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
   R2 = 0.0;
   Teff2 = 0.0;
   for (j=0;j<=4;j++) {
-    R1 += Rcoeff[j]*pow(M1,j);
-    Teff1 += Tcoeff[j]*pow(M1,j);
-    R2 += Rcoeff[j]*pow(M2,j);
-    Teff2 += Tcoeff[j]*pow(M2,j);
+    R1 += Rcoeff[j]*pow(logM1,j);
+    Teff1 += Tcoeff[j]*pow(logM1,j);
+    R2 += Rcoeff[j]*pow(logM2,j);
+    Teff2 += Tcoeff[j]*pow(logM2,j);
   }
 
   M1 = pow(10.,pars[0]);
