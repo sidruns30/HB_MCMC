@@ -316,12 +316,10 @@ int main(int
   for (iter=0; iter<Niter; iter++) {
     
     if(iter % 10 == 0) {begin = clock();}
-    
-    alpha = ran2(&seed);  
-    jscale = pow(10.,-6.+6.*alpha);
-
     //loop over chains
     for(j=0; j<NCHAINS; j++) {
+      alpha = ran2(&seed);  
+      jscale = pow(10.,-6.+6.*alpha);
       /* propose new solution */
       jump=0;
       /* DE proposal; happens after 500 cycles */
