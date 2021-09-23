@@ -13,5 +13,6 @@ logL.*
 chain.*
 subpar.*
 scripting*
+**tst/
 #**/figures
 #**/lightcurves
