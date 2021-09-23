@@ -14,9 +14,9 @@
 #define MSUN 1.9885e33
 #define RSUN 6.955e10
 #define SEC_DAY 86400.0
-#define SQR(x) (x*x)
-#define CUBE(x) (x*x*x)
-#define QUAD(x) (x*x*x*x)
+#define SQR(x) ((x)*(x))
+#define CUBE(x) ((x)*(x)*(x))
+#define QUAD(x) ((x)*(x)*(x)*(x))
 
 static inline void swap(double *x, double *y){
   double temp = *x;
@@ -27,10 +27,6 @@ static inline void swap(double *x, double *y){
 /*********************************************************/
 double A_rh(double R, double h)
 {
-  /*Commented stuff with extra overhead*/
-  //double area;
-  //area = R*R*asin(h/R)-h*sqrt(R*R-h*h);
-  //return area;
   return R*R*asin(h/R)-h*sqrt(R*R-h*h);
 }
 /*********************************************************/
