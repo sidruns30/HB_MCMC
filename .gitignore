@@ -16,3 +16,21 @@ subpar.*
 **/lightcurves
 mcmc
 
+#ignore all files
+lombscargle.py
+*.exe
+C_python*
+**/job_outputs
+submit_job*
+.vscode
+**/extra
+**/figures
+**/papers
+*/.out
+logL.*
+chain.*
+subpar.*
+scripting*
+**tst/
+**/figures
+**/lightcurves
