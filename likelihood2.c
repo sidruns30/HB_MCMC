@@ -14,8 +14,9 @@
 #define MSUN 1.9885e33
 #define RSUN 6.955e10
 #define SEC_DAY 86400.0
-#define SQR(x) (x*x)
-#define QUAD(x) (x*x*x*x)
+#define SQR(x) ((x)*(x))
+#define CUBE(x) ((x)*(x)*(x))
+#define QUAD(x) ((x)*(x)*(x)*(x))
 
 static inline void swap(double *x, double *y){
   double temp = *x;
@@ -26,10 +27,6 @@ static inline void swap(double *x, double *y){
 /*********************************************************/
 double A_rh(double R, double h)
 {
-  /*Commented stuff with extra overhead*/
-  //double area;
-  //area = R*R*asin(h/R)-h*sqrt(R*R-h*h);
-  //return area;
   return R*R*asin(h/R)-h*sqrt(R*R-h*h);
 }
 /*********************************************************/
@@ -77,9 +74,10 @@ void traj(double t, double pars[], double pos[],
   double M = 2.*PI * (t-T0)/P; 
   M = fmod(M,2*PI);
   double EE = M;
+  double sin_M = sin(M);
 
-  if(sin(M) != 0.0){ 
-  	 EE = M + 0.85*e*sin(M)/fabs(sin(M));
+  if(sin_M != 0.0){ 
+  	 EE = M + 0.85*e*sin_M/fabs(sin_M);
   }
   for(i=0;i<6;i++){
 	EE = EE - (EE-e*sin(EE)-M)/(1-e*cos(EE));
@@ -147,6 +145,20 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
   double Rcoeff[] = {0.00158766,0.921233,-0.155659,-0.0739842,0.0581150};
   int j,itime=0;
 
+  // This removes 4 log10 calls:
+  double logM1 = pars[0];
+  double logM2 = pars[1]; 
+  R1 = 0.0;
+  Teff1 = 0.0;
+  R2 = 0.0;
+  Teff2 = 0.0;
+  for (j=0;j<=4;j++) {
+    R1 += Rcoeff[j]*pow(logM1,j);
+    Teff1 += Tcoeff[j]*pow(logM1,j);
+    R2 += Rcoeff[j]*pow(logM2,j);
+    Teff2 += Tcoeff[j]*pow(logM2,j);
+  }
+
   M1 = pow(10.,pars[0]);
   M2 = pow(10.,pars[1]);
   P = pow(10.,pars[2])*SEC_DAY;
@@ -164,64 +176,60 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
   //P = sqrt(4.0*PI*PI*a*a*a/(G*Mtot));
   Pdays = P/SEC_DAY;
   //printf("%12.5e %12.5e %12.5e\n",a,P,Pdays);
-  R1 = 0.0;
-  Teff1 = 0.0;
-  R2 = 0.0;
-  Teff2 = 0.0;
-  M1 = log10(M1);
-  M2 = log10(M2);
-  for (j=0;j<=4;j++) {
-    R1 += Rcoeff[j]*pow(M1,j);
-    Teff1 += Tcoeff[j]*pow(M1,j);
-    R2 += Rcoeff[j]*pow(M2,j);
-    Teff2 += Tcoeff[j]*pow(M2,j);
-  }
-  M1 = pow(10.,M1);
-  M2 = pow(10.,M2);
   R1 = pow(10.,R1)*rr1;
   R2 = pow(10.,R2)*rr2;
   Teff1 = pow(10.,Teff1)/5580.;
   Teff2 = pow(10.,Teff2)/5580.;
 
-  Flux1 = PI*R1*R1*pow(Teff1,4.);
-  Flux2 = PI*R2*R2*pow(Teff2,4.);
+  Flux1 = PI*R1*R1*QUAD(Teff1);
+  Flux2 = PI*R2*R2*QUAD(Teff2);
+
+  /*Siddhant: taking out all the redundant function calls from the loop*/
+  //convert back to Agnieszka units
+  Mtot = M1+M2;
+  aR = a/RSUN;
+  Amag_limb=1.;
+
+  double sin_inc = sin(inc);
+  double iPdays_to_one_third = pow(Pdays, -1./3);
+  double iMtot_to_two_thirds = pow(Mtot, -2./3);
+
+  double cos_ff;
+  double cos_2theta;
+
   for (itime=0; itime<Nt; itime++){
     t=times[itime];
     traj(t,pars,pos,&zdot,&rE,&theta,&rr,&ff);
     rr = rr/RSUN; //units of RSUN
+    cos_ff = cos(ff);
+    cos_2theta = cos(2.*theta);
     //projected separation in units of RSUN
     d = sqrt((pos[3]-pos[0])*(pos[3]-pos[0])+(pos[4]-pos[1])*(pos[4]-pos[1]))/RSUN;
-    Amag_limb=1.;
+    /******************COMPUTE COEFFICIENTS************************/
+    /* For Amag2 */
+    Adoppler = 2.8e-3 * alphabeam * sin_inc * iPdays_to_one_third * iMtot_to_two_thirds * M1 * zdot;
+    Aellipse_phi = -alphaev * (M1/M2) * SQR(sin_inc) * cos_2theta * CUBE(R2) / CUBE(rr);
+    Am = (1./9.) * alphaev * (2.+5.*M1/M2) * (2.-3.* SQR(sin_inc)) *CUBE(R2) / CUBE(aR);
+    Aellipse_mean = Am * (e*cos_ff * (3. + 3.*e*cos_ff + e*e*cos_ff*cos_ff)
+			                    + 3.*e - 3.*e*e + e*e*e);
+    Aellipse_mean = Aellipse_mean/(CUBE(1.0-e*e));
+    Amag2[itime] = Flux2 * (Amag_limb + Adoppler + Aellipse_phi + Aellipse_mean);
+    
+    /*Siddhant: why are we computing the same thing again? I might remove this*/
+    /* For Amag 1*/
+    Adoppler = -1 * Adoppler * M2 / M1; //-2.8e-3*alphabeam*sin(inc)*pow(Pdays,-1./3)*pow(Mtot,-2./3.)*M2*zdot;
+    Aellipse_phi = -alphaev * (M2/M1) * SQR(sin_inc) * cos_2theta * CUBE(R1) / CUBE(rr);
+    Am = (1./9.) * alphaev * (2.+5.*M2/M1) * (2.-3.* SQR(sin_inc)) * CUBE(R1) / CUBE(aR);
+    Aellipse_mean = Am * (e*cos_ff * (3. + 3.*e*cos_ff + e*e*cos_ff*cos_ff)
+			                    + 3.*e - 3.*e*e + e*e*e);
+    Aellipse_mean = Aellipse_mean/CUBE(1.0-e*e);
+    Amag1[itime] = Flux1 * (Amag_limb+Adoppler + Aellipse_phi + Aellipse_mean);
 
-    //convert back to Agnieszka units
-    Mtot = M1+M2;
-    aR = a/RSUN;
-    Adoppler = 2.8e-3*alphabeam*sin(inc)*pow(Pdays,-1./3)*pow(Mtot,-2./3.)*M1*zdot;
-    Aellipse_phi = -alphaev*(M1/M2)*sin(inc)*sin(inc)*cos(2.*theta)*R2*R2*R2/(rr*rr*rr);
-    Am = (1./9.)*alphaev*(2.+5.*M1/M2)*(2.-3.*sin(inc)*sin(inc))*R2*R2*R2/(aR*aR*aR);
-    Aellipse_mean = Am*(e*cos(ff)*((3.+3.*e*cos(ff)+e*e*cos(ff)*cos(ff)))
-			+3.*e-3.*e*e+e*e*e);
-    Aellipse_mean = Aellipse_mean/((1.0-e*e)*(1.0-e*e)*(1.0-e*e));
-    //printf("%12.5e %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
-    //	   t,Pdays,Mtot,Adoppler,Aellipse_phi,Am,Aellipse_mean);
-    Amag2[itime] = Flux2*(Amag_limb+Adoppler+1*Aellipse_phi+1*Aellipse_mean);
-    if (pos[5] > pos[2]) {
-      area = overlap(R1,R2,d);
-      Amag2[itime]-=area*pow(Teff2,4.);
-    }
-    Adoppler = -2.8e-3*alphabeam*sin(inc)*pow(Pdays,-1./3)*pow(Mtot,-2./3.)*M2*zdot;
-    Aellipse_phi = -alphaev*(M2/M1)*sin(inc)*sin(inc)*cos(2.*theta)*R1*R1*R1/(rr*rr*rr);
-    Am = (1./9.)*alphaev*(2.+5.*M2/M1)*(2.-3.*sin(inc)*sin(inc))*R1*R1*R1/(aR*aR*aR);
-    Aellipse_mean = Am*(e*cos(ff)*((3.+3.*e*cos(ff)+e*e*cos(ff)*cos(ff)))
-			+3.*e-3.*e*e+e*e*e);
-    Aellipse_mean = Aellipse_mean/((1.0-e*e)*(1.0-e*e)*(1.0-e*e));
-    //printf("%12.5e %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
-    //	   t,zdot,rr,Adoppler,Aellipse_phi,Am,Aellipse_mean);
-    Amag1[itime] = Flux1*(Amag_limb+Adoppler+1*Aellipse_phi+1*Aellipse_mean);
-    if (pos[5] < pos[2]) {
-      area = overlap(R1,R2,d);
-      Amag1[itime]-=area*pow(Teff1,4.);
-    }
+    /*Siddhant: what is this for? */
+    area = overlap(R1,R2,d);
+    if (pos[5] > pos[2]) {  Amag2[itime]-=area*QUAD(Teff2);}
+    else if (pos[5] < pos[2]) { Amag1[itime]-=area*QUAD(Teff1);}
+
     template[itime]=(Amag1[itime]+Amag2[itime])*Flux_TESS;
   }
 }
