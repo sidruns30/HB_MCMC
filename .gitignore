@@ -1,4 +1,4 @@
-gnore all files
+#iggnore all files
 lombscargle.py
 *.exe
 C_python*
@@ -13,7 +13,7 @@ logL.*
 chain.*
 subpar.*
 **/figures
-**/lightcurves
+#**/lightcurves
 mcmc
 
 #ignore all files
@@ -33,4 +33,4 @@ subpar.*
 scripting*
 **tst/
 **/figures
-**/lightcurves
+#**/lightcurves

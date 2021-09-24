@@ -5,24 +5,8 @@ import numpy as np
 import glob, os
 
 # Get the directory name with the lightcurve
-lc_dir = os.getcwd() + '/lightcurves'
+lc_dir = os.getcwd() + '/../lightcurves'
 lc_list = glob.glob(lc_dir + '/*txt')
-
-# Load the lightcurves
-def load_lc(lc_name):
-    time, flux  = [], []
-    with open(lc_name, "r") as f:
-        for i, line in enumerate(f.readlines()):
-            # Skip the first line
-            if i == 0: pass
-            else: data = line.split()
-            # Load cols 0, 1 if third column is good
-            if (i != 0 and float(data[3]) == 0):
-                time.append(float(data[0]))
-                flux.append(float(data[1]))
-    return np.array(time), np.array(flux)
-
-time, flux = load_lc(lc_list[0])
 
 # Construct a periodogram; find best fit freqs
 from astropy.timeseries import LombScargle
@@ -50,10 +34,7 @@ def phase_fold(time, flux):
     print(ind, power[ind])
     phase = time * frequency[0] - math.floor(time * frequency[0])
 
-
-phase_fold(time, flux)
-
-class lightcurvve:
+class lightcurve:
     def __init__(self, **kwargs):
         self.flux = None
         self.time = None
@@ -69,7 +50,7 @@ class lightcurvve:
     def load_lc(self, lc_name, **kwargs):
         time, flux  = [], []
         if ('skiprows' in kwargs): skiprows = kwargs['skiprows']
-        else: skiprows = 0
+        else: skiprows = 1
         with open(lc_name, "r") as f:
             for i, line in enumerate(f.readlines()):
                 # Skip the first few lines
@@ -84,7 +65,7 @@ class lightcurvve:
         self.time = np.array(time)
     # construct the periodogram for the lightcurve
     def lombscargle(self, **kwargs):
-        if (flux and time):
+        if ((self.flux is not None) and (self.time is not None)):
             # oversampling factor for frequency grid
             if ('oversample' in kwargs): oversample = kwargs['oversample']
             else: oversample = 5
@@ -92,11 +73,11 @@ class lightcurvve:
             if ('freq' in kwargs): self.freq = kwargs['freq']
             else:
                 # assuming a uniformly spaced data (TESS)
-                f_low = 1 / (time[-1] - time[0])
-                f_nyq = 0.5 /(time[1] - time[0])
-                self.freq = np.linspace(f_low, f_nyq, oversample*len(time))
+                f_low = 1 / (self.time[-1] - self.time[0])
+                f_nyq = 0.5 /(self.time[1] - self.time[0])
+                self.freq = np.linspace(f_low, f_nyq, oversample*len(self.time))
             # Now construct the periodogram
-            self.power = LombScargle.power(self.freq)
+            self.power = LombScargle(self.time, self.flux).power(self.freq)
         else: raise ValueError('Flux and time not loaded in the lightcurve')
     # supplementary function to get the harmonics in an array with a certain tolerance
     def get_harmonics(arr, **kwargs):
@@ -152,10 +133,11 @@ class lightcurvve:
     # binning on the phase folded lightcurve
     def bin_lc(self, **kwargs):
         if ('N' in kwargs): N = kwargs['N']
-        else: N = len(flux) / 100
+        else: N = len(self.flux) / 100
         if not(self.folded_flux): self.phase_fold(self)
         # throw away points that are more than 4 std from binned flux
         bins = np.split(self.phase, 100)
         
-            
-
+lc = lightcurve()
+lc.load_lc(lc_name = lc_list[0])
+lc.lombscargle()
