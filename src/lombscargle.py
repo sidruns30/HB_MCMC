@@ -48,6 +48,7 @@ class lightcurve:
         if ('period' in kwargs): self.time = kwargs['period']
     # load the lightcurve from the provided lc dir
     def load_lc(self, lc_name, **kwargs):
+        self.id = lc_name[len(lc_dir):-4]
         time, flux  = [], []
         if ('skiprows' in kwargs): skiprows = kwargs['skiprows']
         else: skiprows = 1
@@ -124,8 +125,8 @@ class lightcurve:
         print("Guessed period of the lightcurve: %f" %self.period)
     # phase fold on the best guessed frequency
     def phase_fold(self, **kwargs):
-        if not(self.power): self.lombscargle()
-        if not(self.period): self.guess_period(**kwargs)
+        if self.power is None: self.lombscargle()
+        if self.period is None: self.guess_period(**kwargs)
         self.phase = (self.time % self.period) / self.period
         _ = np.argsort(self.phase)
         self.phase = self.phase[_]
@@ -134,11 +135,29 @@ class lightcurve:
     def bin_lc(self, **kwargs):
         if ('N' in kwargs): N = kwargs['N']
         else: N = len(self.flux) / 100
-        if not(self.folded_flux): self.phase_fold(self)
+        if self.folded_flux is None: self.phase_fold(self)
         # throw away points that are more than 4 std from binned flux
         bins = np.split(self.phase, 100)
+    # Plot the orignal and phase folded lightcurve
+    def plot_lc(self, folded=False):
+        if folded:
+            fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(7,7))
+            axes[0].plot(self.time, self.flux)
+            axes[0].set_title("Time and flux")
+            axes[1].plot(self.phase, self.folded_flux)
+            axes[1].set_title("Folded flux folded at period %f" %self.period)
+        if not folded:
+            fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(7,7))
+            axes[0].plot(self.time, self.flux)
+            axes[0].set_title("Time and flux")
+            axes[1].plot(self.freq, self.power)
+            axes[1].set_title("LombScargle periodogram for the lightcurve")
+        plt.show()
+        plt.savefig("../figures/%s_fig.png" % self.id)
 
 lc = lightcurve()
 lc.load_lc(lc_name = lc_list[0])
 lc.lombscargle()
 lc.guess_period()
+lc.phase_fold()
+lc.plot_lc(folded=True)
