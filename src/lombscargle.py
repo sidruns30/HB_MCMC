@@ -155,6 +155,7 @@ class lightcurvve:
         else: N = len(flux) / 100
         if not(self.folded_flux): self.phase_fold(self)
         # throw away points that are more than 4 std from binned flux
-        #for i in range()
+        bins = np.split(self.phase, 100)
+        
             
 
