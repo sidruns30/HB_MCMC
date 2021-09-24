@@ -80,7 +80,7 @@ class lightcurve:
             self.power = LombScargle(self.time, self.flux).power(self.freq)
         else: raise ValueError('Flux and time not loaded in the lightcurve')
     # supplementary function to get the harmonics in an array with a certain tolerance
-    def get_harmonics(arr, **kwargs):
+    def get_harmonics(self, arr, **kwargs):
         # sort the array by frequency
         arr = np.sort(arr)
         tot_counts = [] # total number of harmonics present in an array
@@ -99,13 +99,13 @@ class lightcurve:
         else: 
             # return the frequency with the most harmonics present
             f_best = arr[np.argmax(tot_counts)]
-            print("Found %i harmonics with best fit frequency as %d" %n_harmonics, f_best)
+            print("Found %i harmonics with best fit frequency as %f" %(n_harmonics, f_best))
             return f_best
     # estimate the period of the signal if none is provided
     ''' if 'sufficiently' strong harmonics are present then the best fit frequency is
     the lowest of the harmoics otherwise the period with max power is selected'''
     def guess_period(self, **kwargs):
-        if not(self.power): self.lombscargle()
+        if self.power is None: self.lombscargle()
         # narrow down on the top few frequencies from LombScargle
         # some of these values are artificially set to make sense
         peak_distance = 5 * int(len(self.freq) / len(self.time))    # dist between peaks
@@ -119,9 +119,9 @@ class lightcurve:
         indices = indices[-1:-max_peaks:-1]
         test_frequencies = self.freq[indices]
         # check if mutiple harmonics are returned; otherwise use the best frequency
-        self.period = 1 / self.get_harmonics(test_frequencies, **kwargs)
+        self.period = 1 / self.get_harmonics(np.array(test_frequencies), **kwargs)
         if self.period == -1: self.period = 1 / test_frequencies[-1]
-        print("Guessed period of the lightcurve: %d" %self.period)
+        print("Guessed period of the lightcurve: %f" %self.period)
     # phase fold on the best guessed frequency
     def phase_fold(self, **kwargs):
         if not(self.power): self.lombscargle()
@@ -137,7 +137,8 @@ class lightcurve:
         if not(self.folded_flux): self.phase_fold(self)
         # throw away points that are more than 4 std from binned flux
         bins = np.split(self.phase, 100)
-        
+
 lc = lightcurve()
 lc.load_lc(lc_name = lc_list[0])
 lc.lombscargle()
+lc.guess_period()
