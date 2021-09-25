@@ -6,13 +6,13 @@ C_python*
 submit_job*
 .vscode
 **/extra
-**/figures
+#**/figures
 **/papers
 */.out
 logL.*
 chain.*
 subpar.*
-**/figures
+#**/figures
 #**/lightcurves
 mcmc
 
@@ -24,7 +24,7 @@ C_python*
 submit_job*
 .vscode
 **/extra
-**/figures
+#**/figures
 **/papers
 */.out
 logL.*
@@ -32,5 +32,5 @@ chain.*
 subpar.*
 scripting*
 **tst/
-**/figures
+#**/figures
 #**/lightcurves
