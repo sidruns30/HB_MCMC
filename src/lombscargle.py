@@ -4,7 +4,6 @@
 from typing_extensions import final
 import numpy as np
 import glob, os
-
 from numpy.core.numeric import indices
 
 # Get the directory name with the lightcurve
@@ -15,7 +14,9 @@ lc_list = glob.glob(lc_dir + '/*txt')
 from astropy.timeseries import LombScargle
 from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
+import matplotlib
 import math
+matplotlib.use('agg')
 
 def phase_fold(time, flux):
     f_nyq = 0.5 / (time[1] - time[0])
@@ -104,7 +105,7 @@ class lightcurve:
             else:
                 # assuming a uniformly spaced data (TESS)
                 f_low = 1 / (self.time[-1] - self.time[0])
-                f_nyq = 0.5 /(self.time[1] - self.time[0])
+                f_nyq = 0.5 /(30 / 60 / 24)         # sampling time is 30 min
                 self.freq = np.linspace(f_low, f_nyq, oversample*len(self.time))
             # Now construct the periodogram
             self.power = LombScargle(self.time, self.flux).power(self.freq)
@@ -142,8 +143,8 @@ class lightcurve:
         # narrow down on the top few frequencies from LombScargle
         # some of these values are artificially set to make sense
         peak_distance = 5 * int(len(self.freq) / len(self.time))    # dist between peaks
-        peak_height = max(self.power) / 10                           # min peak height 
-        prominence = max(self.power) / 5                            # min peak prominence from its neighbors
+        peak_height = max(self.power) / 20                           # min peak height 
+        prominence = max(self.power) / 10                            # min peak prominence from its neighbors
         indices = find_peaks(self.power, distance = peak_distance, 
                             height = peak_height, prominence=prominence)[0]
         # sort peak indices by power
@@ -151,6 +152,10 @@ class lightcurve:
         max_peaks = 10                                              # maximum frequencies to look at
         indices = indices[-1:-max_peaks:-1]                         # indices sorted from highest to lowest in power
         test_frequencies = self.freq[indices]
+        # setting reasonable limits on test frequenies
+        f_low_limit = 0.1   # period of 10 days
+        f_high_limit = 6    # period of 4 hours
+        test_frequencies = self.freq[(self.freq > f_low_limit) & (self.freq < f_high_limit)]
         # check if mutiple harmonics are returned; otherwise use the best frequency
         self.period = 1 / self.get_harmonics(np.array(test_frequencies), **kwargs)
         if self.period == -1: self.period = 1 / test_frequencies[-1]
@@ -165,7 +170,7 @@ class lightcurve:
             print("Period after refining using LombScargle is: %f" %self.period)
         # refine 2: minimize the sum(|dy|) of the phase folded lightcurve
         if refine == 2:
-            freq_grid = np.linspace(0.98 / self.period, 1.02 / self.period, 2000)
+            freq_grid = np.linspace(0.95 / self.period, 1.05 / self.period, 2000)
             sum_abs_dflux = []
             # phase fold over each frequency
             for freq in freq_grid:
@@ -189,37 +194,62 @@ class lightcurve:
     # binning on the phase folded lightcurve
     def bin_lc(self, **kwargs):
         if ('N' in kwargs): N = kwargs['N']
-        else: N = len(self.flux) / 100
+        else: N = 100          # Number of bins
         if self.folded_flux is None: self.phase_fold(self)
-        # throw away points that are more than 4 std from binned flux
-        bins = np.split(self.phase, 100)
+        # Future: throw away points that are more than 4 std from binned flux
+        self.binned_folded_flux    = np.array([np.average([fluxes for fluxes in flux_split]) for flux_split in np.array_split(self.folded_flux, N)])
+        self.binned_foled_flux_err = np.array([np.nanstd([fluxes for fluxes in flux_split]) for flux_split in np.array_split(self.folded_flux, N)])
+        self.binned_phase          = np.array([np.average([phases for phases in phase_split]) for phase_split in np.array_split(self.phase, N)])
     # Plot the orignal and phase folded lightcurve
     def plot_lc(self):
-        if self.phase is not None:
-            fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(7,10))
-            axes[0].plot(self.time, self.flux, "x")
-            axes[0].set_title("Time and flux")
-            axes[1].plot(self.phase, self.folded_flux, '.', markersize=1)
-            axes[1].set_title("Folded flux folded at period %f" %self.period)
-            axes[2].plot(self.freq, self.power)
-            axes[2].set_title("LombScargle periodogram for the lightcurve")
-        else:
-            fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(7,7))
-            axes[0].plot(self.time, self.flux, "x")
-            axes[0].set_title("Time and flux")
-            axes[1].plot(self.freq, self.power)
-            axes[1].set_title("LombScargle periodogram for the lightcurve")
+        if self.phase is None: self.phase_fold()
+        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(7,15))
+        axes[0].plot(self.time, self.flux, "x")
+        axes[0].set_title("Time and flux", family="serif")
+        axes[0].set_xlabel("Time [JD]", family="serif")
+        axes[0].set_ylabel("Flux", family="serif")
+        axes[0].set_ylim((0.95, 1.05))
+        axes[1].plot(self.phase, self.folded_flux, '.', color='yellow', markersize=0.7)
+        axes[1].set_title("Folded flux folded at period %f" %self.period, family="serif")
+        axes[1].errorbar(self.binned_phase, self.binned_folded_flux, self.binned_foled_flux_err, ecolor='red', color='k', label='binned folded flux')
+        axes[1].set_xlabel("Phase", family="serif")
+        axes[1].set_ylabel("Flux", family="serif")
+        axes[1].set_ylim((0.95, 1.05))
+        axes[2].plot(self.freq, self.power, color='pink')
+        axes[2].set_title("LombScargle periodogram for the lightcurve", family="serif")
+        axes[2].set_xlabel("Frequency [cyc/day]", family="serif")
+        axes[2].set_ylabel("Power", family="serif")
+        axes[2].set_xlim((0, 5))
+        for ax in axes: ax.legend()
         plt.savefig("../figures/%s_fig.png" % self.id)
+    # write the phase folded lightcurve to a file
+    def write_lc(self, **kwargs):
+        if self.binned_folded_flux is None: self.bin_lc(**kwargs)
+        fname = "../lightcurves/folded_lightcurves/%s" % self.id
+        with open(fname, "w") as f:
+            # Number of points to write
+            N = len(self.binned_folded_flux)
+            f.write("%d\n" % N)
+            # Write for two periods
+            for iter in [1, 2]:
+                for phase, flux, flux_err in zip(self.binned_phase, self.binned_folded_flux, self.binned_foled_flux_err):
+                    phase_to_time = iter * phase * self.period
+                    f.write("%f\t%f\t%f\n" % (phase_to_time, flux, flux_err))
+    # Wrapper to call all of the above functions with just one call
+    def generate_lc(self, lc_name):
+        self.load_lc(lc_name)
+        self.lombscargle()
+        self.guess_period(refine=2)
+        self.phase_fold()
+        self.bin_lc()
+        self.plot_lc()
+        self.write_lc()
 
 for lk_name in lc_list:
     lc = lightcurve()
     print("Loading lightcurve: ", lk_name)
-    try:    lc.load_lc(lc_name = lk_name)#lc_dir + '/110602878.txt')#lc_list[0])
+    try: lc.generate_lc(lk_name)
     except: pass
-    lc.lombscargle()
-    lc.guess_period(refine=2)
-    lc.phase_fold()
-    lc.plot_lc()
 
 '''
 class helper_functions:
