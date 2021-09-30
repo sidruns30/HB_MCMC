@@ -8,6 +8,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <omp.h>
+#include<unistd.h>
 #include "likelihood2.c"
 
 #define NPARAMS 11
@@ -107,21 +109,34 @@ void free_1d(double *arr){
 }
 
 void free_2d(double **arr, int size){
-  for (int i=0;i<size;i++){free(arr[i]);}
+  int i;
+  for (i=0;i<size;i++){free(arr[i]);}
   free(arr);
 }
 
 void free_3d(double ***arr, int size1, int size2){
-  for (int i=0;i<size1;i++){
-    for (int j=0;j<size2;j++){free(arr[i][j]);}
+  int i,j;
+  for (i=0;i<size1;i++){
+    for (j=0;j<size2;j++){free(arr[i][j]);}
     free(arr[i]);
   }
   free(arr);
 }
 
+// Function to check if (parameter) file exists
+int exists(const char *fname){
+    FILE *file;
+    if ((file = fopen(fname, "r"))){
+        fclose(file);
+        return 1;
+    }
+    return 0;
+}
+
 int main(int
  argc, char* argv[])
 {
+  //omp_set_num_threads(1);
   /* Siddhant: Adding small variable descriptions */
   long Niter;                     // Chain iterations
   double **P_;                    // Contains parameters - check why different from x - seems uneccessary
@@ -168,22 +183,23 @@ int main(int
   true_err = (double)atof(argv[3]);
   burn_in = atoi(argv[4]);
 
-  strcat(subparname,"subpar.");
+  strcat(subparname,"../subpar.");
   strcat(subparname,RUN_ID);
   strcat(subparname,".dat");
-  strcat(parname,"par.");
+  strcat(parname,"../par.");
   strcat(parname,RUN_ID);
   strcat(parname,".dat");
-  strcat(chainname,"chain.");
+  strcat(chainname,"../chain.");
   strcat(chainname,RUN_ID);
   strcat(chainname,".dat");
-  strcat(logLname,"logL.");
+  strcat(logLname,"../logL.");
   strcat(logLname,RUN_ID);
   strcat(logLname,".dat");
+  strcat(outname,"../lightcurves/mcmc_lightcurves/");
   strcat(outname,RUN_ID);
   strcat(outname,".out");
   printf("%s\n",parname);
-  strcpy(dfname,"");                // TESS data file
+  strcpy(dfname,"../lightcurves/");                // TESS data file
   strcat(dfname,RUN_ID);
   strcat(dfname,".txt");            // complete data set
   //strcat(dfname,".bin");          // binned data
@@ -209,7 +225,8 @@ int main(int
   srand(Niter);
   long seed = Niter;
   //read in starting parameters near best solution
-  param_file = fopen(parname,"r");
+  printf("Opening parameter file \n");
+  if (exists(parname)){param_file = fopen(parname,"r");}
   printf("Parameter file: %s\n",parname);
   //initialize priors
   set_limits(limited,limits);
@@ -217,12 +234,12 @@ int main(int
   initialize_proposals(sigma, history);
   /* Siddhant: Initializing the chain parameters*/
   for (i=0;i<NPARAMS;i++) {
-    fscanf(param_file,"%lf\n", &tmp);
+    if (exists(parname)){fscanf(param_file,"%lf\n", &tmp);}
+    else tmp = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);  // Assign random parameters
     P_[0][i] = tmp;
     P_0[i]   = tmp;
     x[0][i]  = P_[0][i];
     xmap[i]  = P_[0][i];
-
     for(j=1; j<NCHAINS; j++) {
       P_[j][i] = P_[0][i];
       x[j][i]  = P_[0][i];
@@ -242,9 +259,9 @@ int main(int
       }
     }
   }
-  fclose(param_file);
-
+  if (exists(parname)){fclose(param_file);}
   /* Read TESS data file */
+  printf("Opening data file %s \n", dfname);
   data_file = fopen(dfname,"r");
   tmp = 0;
   fscanf(data_file,"%ld\n", &Nt);
@@ -261,6 +278,7 @@ int main(int
     rdata[i*4+3]=tmp4;
     if (tmp4 == 0) subN++;
   }
+  printf("Closing data file \n");
   fclose(data_file);
 
   a_data       = (double *)malloc(subN*sizeof(double));
@@ -302,6 +320,7 @@ int main(int
   for(i=0; i<NCHAINS; i++) logLx[i] = logLmap;
 
   acc=0;
+  printf("Creating chain and log files \n");
   chain_file = fopen(chainname,"w");
   logL_file  = fopen(logLname,"w");
 
@@ -314,9 +333,9 @@ int main(int
   clock_t begin, end;
   /* Main MCMC Loop*/
   for (iter=0; iter<Niter; iter++) {
-    
     if(iter % 10 == 0) {begin = clock();}
     //loop over chains
+    //#pragma omp for schedule(static)
     for(j=0; j<NCHAINS; j++) {
       alpha = ran2(&seed);  
       jscale = pow(10.,-6.+6.*alpha);
@@ -378,7 +397,7 @@ int main(int
       k = iter - (iter/NPAST)*NPAST;
       for(i=0; i<NPARAMS; i++) history[j][k][i] = x[index[j]][i];
     }
-
+    /********Chain Loop ends**********/
     // Call timer after 10 iterations
     if (iter%10 == 9){
       end = clock();
@@ -386,7 +405,6 @@ int main(int
       printf("time spent in the last 10 iterations: %f \n", time_spent);
       }
 
-    /********Chain Loop ends**********/
     //update map parameters
     if (logLx[index[0]] > logLmap) {
       for (i=0;i<NPARAMS;i++) {

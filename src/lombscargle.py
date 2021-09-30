@@ -143,34 +143,38 @@ class lightcurve:
         # narrow down on the top few frequencies from LombScargle
         # some of these values are artificially set to make sense
         peak_distance = 5 * int(len(self.freq) / len(self.time))    # dist between peaks
-        peak_height = max(self.power) / 20                           # min peak height 
-        prominence = max(self.power) / 10                            # min peak prominence from its neighbors
-        indices = find_peaks(self.power, distance = peak_distance, 
-                            height = peak_height, prominence=prominence)[0]
-        # sort peak indices by power
-        indices = indices[np.argsort(self.power[indices])]
-        max_peaks = 10                                              # maximum frequencies to look at
-        indices = indices[-1:-max_peaks:-1]                         # indices sorted from highest to lowest in power
+        peak_height = max(self.power) / 20                          # min peak height 
+        prominence = max(self.power) / 5                            # min peak prominence from its neighbors
+        rel_height = 0.2                                            # relative prominence from which to calculate widths
+        indices, prop = find_peaks(self.power, distance = peak_distance, 
+                            height = peak_height, prominence=prominence, width=rel_height)
+        # integrate by power (?)
+        # sort peak indices by areas
+        '''IMPORTANT: FREQUENCIES ARE NOT MONOTONIC IF SORTED BY AREA! (Change that to avoid errors in harmonic finding)'''
+        #peak_areas = prop['prominences'] * prop['width_heights']
+        #indices = indices[np.argsort(peak_areas)]
+        #max_peaks = 10                                              # maximum frequencies to look at
+        #indices = indices[-1:-max_peaks:-1]                         # indices sorted from highest to lowest in area
         test_frequencies = self.freq[indices]
         # setting reasonable limits on test frequenies
         f_low_limit = 0.1   # period of 10 days
         f_high_limit = 6    # period of 4 hours
-        test_frequencies = self.freq[(self.freq > f_low_limit) & (self.freq < f_high_limit)]
+        test_frequencies = test_frequencies[(test_frequencies > f_low_limit) & (test_frequencies < f_high_limit)]
         # check if mutiple harmonics are returned; otherwise use the best frequency
         self.period = 1 / self.get_harmonics(np.array(test_frequencies), **kwargs)
         if self.period == -1: self.period = 1 / test_frequencies[-1]
         print("Guessed period of the lightcurve after LombScargle: %f" %self.period)
         # Now perform a second iteration of lombscargle, based on the guessed frequency
-        if ('refine' in kwargs): refine = kwargs['refine']
+        if ('refine' in kwargs): 
+            refine = kwargs['refine']
+            freq_grid = np.linspace(0.95 / self.period, 1.05 / self.period, 2000)
         # refine 1: use lombscargle on a more resolved frequency grid
         if refine == 1:
-            freq_grid = np.linspace(0.98 / self.period, 1.02 / self.period, 2000)
             power = LombScargle(self.time, self.flux).power(freq_grid)
             self.period = 1 / freq_grid[np.argmax(power)]
             print("Period after refining using LombScargle is: %f" %self.period)
         # refine 2: minimize the sum(|dy|) of the phase folded lightcurve
         if refine == 2:
-            freq_grid = np.linspace(0.95 / self.period, 1.05 / self.period, 2000)
             sum_abs_dflux = []
             # phase fold over each frequency
             for freq in freq_grid:
@@ -183,6 +187,19 @@ class lightcurve:
                 sum_abs_dflux.append(np.sum(np.abs(flux[1:] - flux[:-1])))
             self.period = 1 / freq_grid[np.argmin(sum_abs_dflux)]
             print("Period after refining using dispersion min is: %f" %self.period)
+        # refine 3: minimize standard deviation after selecting a few periods
+        if refine == 3:
+            sum_std = []
+            # phase fold over each frequency
+            for freq in freq_grid:
+                phase = (self.time % (1 / freq)) * freq
+                _ = np.argsort(phase)
+                phase = phase[_]
+                flux = self.flux[_]
+                # now bin this flux with 10 pts per bin and find std
+                sum_std.append(np.sum([np.nanstd([element for element in flux[i:i+10]]) for i in range(0, len(flux)//10, 10)]))
+            self.period = 1 / freq_grid[np.argmin(sum_std)]
+            print("Period after minimizing std in binned flux is: %f" %self.period)
     # phase fold on the best guessed frequency
     def phase_fold(self, **kwargs):
         if self.power is None: self.lombscargle()
@@ -204,17 +221,18 @@ class lightcurve:
     def plot_lc(self):
         if self.phase is None: self.phase_fold()
         fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(7,15))
-        axes[0].plot(self.time, self.flux, "x")
+        axes[0].plot(self.time[(self.flux > 0.95) & (self.flux < 1.05)], self.flux[(self.flux > 0.95) & (self.flux < 1.05)], "x")
         axes[0].set_title("Time and flux", family="serif")
         axes[0].set_xlabel("Time [JD]", family="serif")
         axes[0].set_ylabel("Flux", family="serif")
-        axes[0].set_ylim((0.95, 1.05))
-        axes[1].plot(self.phase, self.folded_flux, '.', color='yellow', markersize=0.7)
+        axes[1].plot(self.phase[(self.folded_flux > 0.95) & (self.folded_flux < 1.05)], self.folded_flux[(self.folded_flux > 0.95) & (self.folded_flux < 1.05)],
+                                 '.', color='yellow', markersize=0.7)
         axes[1].set_title("Folded flux folded at period %f" %self.period, family="serif")
-        axes[1].errorbar(self.binned_phase, self.binned_folded_flux, self.binned_foled_flux_err, ecolor='red', color='k', label='binned folded flux')
+        axes[1].errorbar(self.binned_phase[(self.binned_folded_flux > 0.95) & (self.binned_folded_flux < 1.05)] , 
+                        self.binned_folded_flux[(self.binned_folded_flux > 0.95) & (self.binned_folded_flux < 1.05)], 
+                        self.binned_foled_flux_err[(self.binned_folded_flux > 0.95) & (self.binned_folded_flux < 1.05)], ecolor='red', color='k', label='binned folded flux')
         axes[1].set_xlabel("Phase", family="serif")
         axes[1].set_ylabel("Flux", family="serif")
-        axes[1].set_ylim((0.95, 1.05))
         axes[2].plot(self.freq, self.power, color='pink')
         axes[2].set_title("LombScargle periodogram for the lightcurve", family="serif")
         axes[2].set_xlabel("Frequency [cyc/day]", family="serif")
@@ -239,7 +257,7 @@ class lightcurve:
     def generate_lc(self, lc_name):
         self.load_lc(lc_name)
         self.lombscargle()
-        self.guess_period(refine=2)
+        self.guess_period(refine=3)
         self.phase_fold()
         self.bin_lc()
         self.plot_lc()
