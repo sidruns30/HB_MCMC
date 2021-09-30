@@ -41,18 +41,26 @@ for lc, id in zip(lc_data, lc_ids):
             if i == 2: val = str(10**(float(val)))
             some_string += " | " + str(param_list[i]) + " = " + val 
 
+        # stop plotting after the first gap of a day
+        time, lc, model = map(numpy.array, (time, lc, model))
+        gaps = time[1:] - time[:-1]
+        try: index = numpy.where(gaps > 10)[0][0]
+        except: index = len(time)
+        time, lc, model = time[:index], lc[:index], model[:index]
+
         # Plot
         plt.style.use("dark_background")
         plt.figure(figsize=(10, 5))
         plt.title("Computed vs model lightcurve (%s)" %id, fontsize=30, family="serif")
         plt.gcf().text(0.2, 0.8, some_string[:140], fontsize=7)
         plt.gcf().text(0.25, 0.75, some_string[140:], fontsize=7)
-        plt.plot(time, lc, 'r-', linewidth=0.5, label="Real Lightcurve")
-        plt.plot(time, model, 'w--', linewidth=0.5, label="Computed lightcurve")
+        plt.plot(time, lc, 'r.', linewidth=0.5, label="Real Lightcurve")
+        plt.plot(time, model, '--', color='yellow', linewidth=1, label="Computed lightcurve")
         plt.xlabel("Time", fontsize=15, family="serif")
         plt.ylabel("Flux", fontsize=15, family="serif")
         #plt.xlim((2225, 2255))
         plt.ylim((0.95, 1.05))
+        plt.grid()
         plt.savefig(os.getcwd() + '/../figures/mcmc/model_lightcurve_%s.png' %id)
         plt.close()
     except: pass
