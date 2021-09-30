@@ -183,23 +183,23 @@ int main(int
   true_err = (double)atof(argv[3]);
   burn_in = atoi(argv[4]);
 
-  strcat(subparname,"../subpar.");
+  strcat(subparname,"../subpars/subpar.");
   strcat(subparname,RUN_ID);
   strcat(subparname,".dat");
-  strcat(parname,"../par.");
+  strcat(parname,"../pars/par.");
   strcat(parname,RUN_ID);
   strcat(parname,".dat");
-  strcat(chainname,"../chain.");
+  strcat(chainname,"../chains/chain.");
   strcat(chainname,RUN_ID);
   strcat(chainname,".dat");
-  strcat(logLname,"../logL.");
+  strcat(logLname,"../logL/logL.");
   strcat(logLname,RUN_ID);
   strcat(logLname,".dat");
   strcat(outname,"../lightcurves/mcmc_lightcurves/");
   strcat(outname,RUN_ID);
   strcat(outname,".out");
   printf("%s\n",parname);
-  strcpy(dfname,"../lightcurves/");                // TESS data file
+  strcpy(dfname,"../lightcurves/original/");                // TESS data file
   strcat(dfname,RUN_ID);
   strcat(dfname,".txt");            // complete data set
   //strcat(dfname,".bin");          // binned data
@@ -261,7 +261,6 @@ int main(int
   }
   if (exists(parname)){fclose(param_file);}
   /* Read TESS data file */
-  printf("Opening data file %s \n", dfname);
   data_file = fopen(dfname,"r");
   tmp = 0;
   fscanf(data_file,"%ld\n", &Nt);
