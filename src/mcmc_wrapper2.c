@@ -15,7 +15,7 @@
 #define NPARAMS 11
 #define NCHAINS 50
 #define NPAST   500
-#define SIGMAP 1.0e-12
+#define SIGMAP 1.0e-1
 #define GAMMA (2.388/sqrt(2.*NPARAMS))
 #define NUM_ELEMENTS(x) (size_of(x)/size_of(x[0]))
 
@@ -199,9 +199,9 @@ int main(int
   strcat(outname,RUN_ID);
   strcat(outname,".out");
   printf("%s\n",parname);
-  strcpy(dfname,"../lightcurves/original/");                // TESS data file
+  strcpy(dfname,"../lightcurves/folded_lightcurves/");                // TESS data file
   strcat(dfname,RUN_ID);
-  strcat(dfname,".txt");            // complete data set
+  //strcat(dfname,".txt");            // complete data set
   //strcat(dfname,".bin");          // binned data
 
   P_ = (double **)malloc(NCHAINS*sizeof(double));
@@ -264,18 +264,19 @@ int main(int
   data_file = fopen(dfname,"r");
   tmp = 0;
   fscanf(data_file,"%ld\n", &Nt);
-
+  Nt = 2*Nt;
   subN         = 0;
-  rdata        = (double *)malloc(4*Nt*sizeof(double));
+  rdata        = (double *)malloc(3*Nt*sizeof(double));
   index        = (int *)malloc(NCHAINS*sizeof(int));
 
   for (i=0;i<Nt;i++) {
-    fscanf(data_file,"%lf %lf %lf %lf\n", &tmp1, &tmp2, &tmp3, &tmp4);
-    rdata[i*4]=tmp1;
-    rdata[i*4+1]=tmp2;
-    rdata[i*4+2]=tmp3;
-    rdata[i*4+3]=tmp4;
-    if (tmp4 == 0) subN++;
+    fscanf(data_file,"%lf\t%lf\t%lf\n", &tmp1, &tmp2, &tmp3);
+    rdata[i*3]=tmp1;
+    rdata[i*3+1]=tmp2;
+    rdata[i*3+2]=tmp3;
+    subN++;
+    //rdata[i*4+3]=tmp4;
+    //if (tmp4 == 0) subN++;
   }
   printf("Closing data file \n");
   fclose(data_file);
@@ -290,13 +291,13 @@ int main(int
 
   subi = 0;
   for (i=0;i<Nt;i++) {
-    tmp4 = rdata[i*4+3];
-    if (tmp4 == 0) {
-      t_data[subi] = rdata[i*4]; 
-      a_data[subi] = rdata[i*4+1]; 
-      e_data[subi] = sqrt(rdata[i*4+1])*true_err;
-      subi++;
-    }
+    // tmp4 = rdata[i*4+3];
+    //if (tmp4 == 0) {
+    t_data[subi] = rdata[i*3]; 
+    a_data[subi] = rdata[i*3+1]; 
+    e_data[subi] = rdata[i*3+2];// sqrt(rdata[i*4+1])*true_err;
+    subi++;
+    //}
   }      
 	
   // initialize parallel tempering

@@ -8,7 +8,7 @@ lc_list = glob.glob(lc_dir + '/*txt')
 
 iter = int(sys.argv[1])
 
-NCHAINS = 20000
+NCHAINS = 10000000
 tol = 0.01
 burn_in  = 1
 
