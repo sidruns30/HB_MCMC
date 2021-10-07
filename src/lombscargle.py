@@ -18,26 +18,29 @@ import matplotlib
 import math
 matplotlib.use('agg')
 
-def phase_fold(time, flux):
-    f_nyq = 0.5 / (time[1] - time[0])
-    ovr_sam = 3
-    N = len(time)
-    frequency = np.linspace(1/N, f_nyq, N*ovr_sam)
-    power = LombScargle(time, flux).power(frequency=frequency)
-    # Find the best fit frequencies
-    ind = find_peaks(power, distance = ovr_sam,
-                    height = np.max(power)/2,
-                    prominence=max(power)/3)[0]
-    ind = ind[np.argsort(power[ind])]
-    plt.plot(frequency, power)
-    plt.plot(frequency[ind], power[ind], 'rx')
-    plt.savefig('figures/lombscargle.png')
-
-    # Sorting by power does not give the best period usually; maybe also sort by period
-    print(1/frequency[ind])
-    print(ind, power[ind])
-    phase = time * frequency[0] - math.floor(time * frequency[0])
-
+class functions:
+    def phase_fold(period, time, flux):
+        phase = (time % period) / period
+        _ = np.argsort(phase)
+        return phase[_], flux[_]
+    # Average array with Npts per bin; returned shape is len(arr)//Npts
+    def avg_bin(arr, Npts):
+        return np.array([np.average(arr[i:i+Npts]) for i in range(0, len(arr) - len(arr)%Npts, Npts)])
+    # Take std dev of array with Npts per bin
+    def std_bin(arr, Npts):
+        return np.array([np.nanstd(arr[i:i+Npts]) for i in range(0, len(arr) - len(arr)%Npts, Npts)])
+    # Subtract a staright line fit from every n points; returned shape is len(arr) [last few points are not subtracted]
+    def remove_line(xarr, yarr, Npts):
+        new_arr = np.array([])
+        for i in range(0, len(xarr) - len(xarr)%Npts, Npts):
+            xpts = xarr[i:i+Npts]
+            ypts = yarr[i:i+Npts]
+            X = np.average(xpts)
+            Y = np.average(ypts)
+            m = np.average((xpts - X)*(ypts - Y))/np.average(np.square(xpts - X))
+            b = Y - m*X
+            new_arr = np.concatenate((new_arr, np.array(ypts - m*xpts  - b)), axis=-1)
+        return new_arr.ravel()
 class lightcurve:
     def __init__(self, **kwargs):
         # required
@@ -56,7 +59,7 @@ class lightcurve:
         if ('period' in kwargs): self.period = kwargs['period']
     # load the lightcurve from the provided lc dir
     def load_lc(self, lc_name, **kwargs):
-        self.id = lc_name[len(lc_dir):-4]
+        self.id = lc_name[len(lc_dir)+1:-4]
         time, flux  = [], []
         if ('skiprows' in kwargs): skiprows = kwargs['skiprows']
         else: skiprows = 1
@@ -125,7 +128,8 @@ class lightcurve:
             for f in _:
                 if (f < tol): ctr += 1
             tot_counts.append(ctr)
-        n_harmonics = max(tot_counts)
+        if len(tot_counts) > 0: n_harmonics = max(tot_counts)
+        else: n_harmonics = -1
         if n_harmonics < 1: 
             #print("Found no harmonics")
             return -1.
@@ -160,6 +164,8 @@ class lightcurve:
         f_low_limit = 0.1   # period of 10 days
         f_high_limit = 6    # period of 4 hours
         test_frequencies = test_frequencies[(test_frequencies > f_low_limit) & (test_frequencies < f_high_limit)]
+        # expend limits if no frequencies are found
+        if len(test_frequencies) < 1: test_frequencies = self.freq[indices]
         # check if mutiple harmonics are returned; otherwise use the best frequency
         self.period = 1 / self.get_harmonics(np.array(test_frequencies), **kwargs)
         if self.period == -1: self.period = 1 / test_frequencies[-1]
@@ -178,26 +184,19 @@ class lightcurve:
             sum_abs_dflux = []
             # phase fold over each frequency
             for freq in freq_grid:
-                phase = (self.time % (1 / freq)) * freq
-                _ = np.argsort(phase)
-                phase = phase[_]
-                flux = self.flux[_]
+                phase, flux = functions.phase_fold(1/freq, self.time, self.flux)
                 # Take the sum of absolute differences between neighboring elements
-                # should be minimum for the correctly folded lightcurve? 
                 sum_abs_dflux.append(np.sum(np.abs(flux[1:] - flux[:-1])))
             self.period = 1 / freq_grid[np.argmin(sum_abs_dflux)]
-            print("Period after refining using dispersion min is: %f" %self.period)
+            print("Period after refining using L1 min is: %f" %self.period)
         # refine 3: minimize standard deviation after selecting a few periods
         if refine == 3:
             sum_std = []
             # phase fold over each frequency
             for freq in freq_grid:
-                phase = (self.time % (1 / freq)) * freq
-                _ = np.argsort(phase)
-                phase = phase[_]
-                flux = self.flux[_]
+                phase, flux = functions.phase_fold(1/freq, self.time, self.flux)
                 # now bin this flux with 10 pts per bin and find std
-                sum_std.append(np.sum([np.nanstd([element for element in flux[i:i+10]]) for i in range(0, len(flux)//10, 10)]))
+                sum_std.append(np.sum(functions.std_bin(flux - functions.remove_line(phase, flux, 10))))
             self.period = 1 / freq_grid[np.argmin(sum_std)]
             print("Period after minimizing std in binned flux is: %f" %self.period)
     # refine an input guessed period (basically copies the methods from top but uses better schemes)
@@ -219,10 +218,7 @@ class lightcurve:
             sum_abs_dflux = []
             # phase fold over each frequency
             for freq in freq_grid:
-                phase = (self.time % (1 / freq)) * freq
-                _ = np.argsort(phase)
-                phase = phase[_]
-                flux = self.flux[_]
+                phase, flux = functions.phase_fold(1/freq, self.time, self.flux)
                 # Take the sum of absolute differences between neighboring elements
                 # should be minimum for the correctly folded lightcurve? 
                 sum_abs_dflux.append(np.sum(np.abs(flux[1:] - flux[:-1])))
@@ -231,14 +227,13 @@ class lightcurve:
         # refine 3: minimize standard deviation after selecting a few periods
         if refine == 3:
             sum_std = []
+            freq_grid = np.linspace(fguess*.95, fguess*1.05, 500)
             # phase fold over each frequency
             for freq in freq_grid:
-                phase = (self.time % (1 / freq)) * freq
-                _ = np.argsort(phase)
-                phase = phase[_]
-                flux = self.flux[_]
+                phase, flux = functions.phase_fold(1/freq, self.time, self.flux)
                 # now bin this flux with 10 pts per bin and find std
-                sum_std.append(np.sum([np.nanstd([element for element in flux[i:i+10]]) for i in range(0, len(flux)//10, 10)]))
+                sum_std.append(np.sum(functions.std_bin(flux[:(10*(len(self.folded_flux)//10))] - functions.remove_line(phase, flux, 10), 10)))
+                #sum_std.append(np.sum([np.nanstd([element for element in flux[i:i+10]]) for i in range(0, len(flux)//10, 10)]))
             self.period = 1 / freq_grid[np.argmin(sum_std)]
             print("Period after minimizing std in binned flux is: %f" %self.period)
     # phase fold on the best guessed frequency
@@ -255,14 +250,11 @@ class lightcurve:
         else: N = 10       # Number of points per bin
         if self.folded_flux is None: self.phase_fold(self)
         # Future: throw away points that are more than 4 std from binned flux
-        arr = self.folded_flux
-        self.binned_folded_flux = np.array([np.average(arr[i:i+N]) for i in range(0, len(arr) - len(arr)%N , N)])
-        self.binned_folded_flux_err = np.array([np.nanstd(arr[i:i+N]) for i in range(0, len(arr) - len(arr)%N , N)])
-        ph = self.phase
-        self.binned_phase = np.array([np.average(ph[i:i+N]) for i in range(0, len(ph) - len(ph)%N , N)])
-        #self.binned_folded_flux    = np.array([np.average([fluxes for fluxes in flux_split]) for flux_split in np.array_split(self.folded_flux, N)])
-        #self.binned_foled_flux_err = np.array([np.nanstd([fluxes for fluxes in flux_split]) for flux_split in np.array_split(self.folded_flux, N)])
-        #self.binned_phase          = np.array([np.average([phases for phases in phase_split]) for phase_split in np.array_split(self.phase, N)])
+        arr, ph = self.folded_flux, self.phase
+        self.binned_phase = functions.avg_bin(ph, N)
+        self.binned_folded_flux = functions.avg_bin(arr, N)
+        print(len(functions.remove_line(self.phase, self.folded_flux, N)))
+        self.binned_folded_flux_err = functions.std_bin(self.folded_flux[:(10*(len(self.folded_flux)//10))] - functions.remove_line(self.phase, self.folded_flux, N), N)
     # Plot the orignal and phase folded lightcurve
     def plot_lc(self, savedir=None):
         if self.phase is None: self.phase_fold()
@@ -289,23 +281,24 @@ class lightcurve:
         for ax in axes: ax.legend()
         if not savedir: savedir = "../figures/%s_fig.png" % self.id
         plt.savefig(savedir)
-    # Plot binned lightcurve
-    def plot_binned(self):
-        loc = fname = "../lightcurves/folded_lightcurves/%s" % self.id
-
-    # write the phase folded lightcurve to a file
+    # write the phase folded lightcurve to a file + append period to the period file
     def write_lc(self, **kwargs):
         if self.binned_folded_flux is None: self.bin_lc(**kwargs)
         fname = "../lightcurves/folded_lightcurves/%s" % self.id
         with open(fname, "w") as f:
-            # Number of points to write
+            # Number of points in LC
             N = len(self.binned_folded_flux)
             f.write("%d\n" % N)
             # Write for two periods
-            for iter in [1, 2]:
+            for iter in range(0, 2, 1):
                 for phase, flux, flux_err in zip(self.binned_phase, self.binned_folded_flux, self.binned_folded_flux_err):
-                    phase_to_time = iter * phase * self.period
+                    phase_to_time = iter * self.period + phase * self.period
                     f.write("%f\t%f\t%f\n" % (phase_to_time, flux, flux_err))
+        fname = "../lightcurves/periods.txt"
+        with open(fname, "a") as f:
+            # Entries are lc id, period and period flag
+            good_period = int(input("Period found? [0 and 1]"))
+            f.write("%d\t%f\t%d\n" %(int(self.id), self.period, int(good_period)))
     # Wrapper to call all of the above functions with just one call
     def generate_lc(self, lc_name):
         self.load_lc(lc_name)
@@ -318,32 +311,25 @@ class lightcurve:
     # Wrapper function to refine period
     def user_period(self, lc_name):
         self.load_lc(lc_name)
-        print("Length of lightcurve is %d" %len(self.flux))
+        print("LC ID IS: ", lc.id)
         self.lombscargle()
         self.guess_period(refine=2)
         self.phase_fold()
-        print("Length of phase flux is: %d" %len(self.phase))
         self.bin_lc()
-        print("Length of bins is: %d" %len(self.binned_folded_flux))
-        self.plot_lc(savedir="../figures/tst2/%s_fig.png" % self.id)
-        self.refine_guess(refine=2)
-        self.phase_fold()
-        self.bin_lc()
-        self.plot_lc(savedir="../figures/tst2/%s_fig.png" % self.id)
+        self.plot_lc(savedir="../figures/tst/%s_fig.png" % self.id)
         cont = input("Press enter to pass or any other key to try different period")
         while(cont):
             refine = int(input("Choice of period refinement [1,2,3]"))
             self.refine_guess(refine)
-            print("New period is: %f" % self.period)
             self.phase_fold()
             self.bin_lc()
-            self.plot_lc(savedir="../figures/tst2/%s_fig.png" % self.id)
+            self.plot_lc(savedir="../figures/tst/%s_fig.png" % self.id)
             cont = input("Try different period? ")
             
         self.write_lc()
-        
-
+        print("\n*****************************************\n")
 start = int(sys.argv[1])
+
 for lk_name in lc_list[start:]:
     print("lc_number: %i" %start)
     lc = lightcurve()
