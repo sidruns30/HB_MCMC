@@ -38,11 +38,14 @@ double overlap(double r1, double r2, double d)
   if (d >= (r1+r2)) area = 0.;
   else if (d < (r1-r2)) area = PI*r2*r2;
   dc = sqrt(r1*r1-r2*r2);
-  h_sq = (4.*d*d*r1*r1- SQR(d*d-r2*r2+r1*r1))
-          /(4.*d*d);
-  h = sqrt(h);
-  if ((d > dc)&(d < (r1+r2))) { area = A_rh(r1,h)+A_rh(r2,h);}
-  if ((d <= dc)&(d >= (r1-r2))) { area = PI*r2*r2-(A_rh(r2,h)-A_rh(r1,h));}
+  if ((d > dc)&(d < (r1+r2))) { 
+    h_sq = (4.*d*d*r1*r1- SQR(d*d-r2*r2+r1*r1))/(4.*d*d);
+    h = sqrt(h);
+    area = A_rh(r1,h)+A_rh(r2,h);}
+  if ((d <= dc)&(d >= (r1-r2))) { 
+    h_sq = (4.*d*d*r1*r1- SQR(d*d-r2*r2+r1*r1))/(4.*d*d);
+    h = sqrt(h);
+    area = PI*r2*r2-(A_rh(r2,h)-A_rh(r1,h));}
   return area;
 }
 
