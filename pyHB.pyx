@@ -7,11 +7,11 @@ cdef extern from "likelihood2.c":
 
 #def lightcurve(times,double logMlens,double Mstar,double Pdays,double e,double sini,double omgf,double T0overP,double logFp50,double Fblend):
 def lightcurve(times,inpars):
-  logM1, logM2, logP_day, e, inc_deg, omega_deg,omega0_deg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale,log_blendFlux=inpars
-  cdef double pars[11]
+  logM1, logM2, logP_day, e, inc_deg, omega_deg,omega0_deg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale,logTanom,log_blendFlux=inpars
+  cdef double pars[12]
   #need to convert angles from rad to deg here
   radeg=180/np.pi
-  pars[:]=[  logM1, logM2, logP_day, e, inc_deg*radeg, omega_deg*radeg,omega0_deg*radeg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale ]
+  pars[:]=[  logM1, logM2, logP_day, e, inc_deg*radeg, omega_deg*radeg,omega0_deg*radeg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale, logTanom ]
   times=np.array(times)
   cdef int Nt=len(times)
   cdef double[:] ctimes = times
@@ -19,7 +19,8 @@ def lightcurve(times,inpars):
   #compute_lightcurve(&ctimes[0],&cAmags[0],Nt,&pars[0]);
   calc_light_curve(&ctimes[0],Nt,&pars[0],&ctemplate[0]);
   template=np.array(ctemplate)
-  return template+10**(log_blendFlux+logFluxTESS)
+  #return template+10**(log_blendFlux+logFluxTESS)
+  return template+10**log_blendFlux
 
 class parspace:
   def __init__(self, *args):
@@ -83,9 +84,12 @@ sp=parspace(
   'Omega', [ -np.pi, np.pi ],
   'Omega0', [ -np.pi, np.pi ],
   'T0', [ -1000, 1000 ],
-  'logFluxTESS', [ -5.0, 5.0 ],
-  'log_rad1_resc', [ -2.0, 2.0 ],
-  'log_rad2_resc', [ -2.0, 2.0 ],
+  'logFluxTESS', [ -10.0, 10.0 ],
+  'log_rad1_resc', [ -2, 2 ],
+  'log_rad2_resc', [ -2, 2 ],
+  #'log_rad1_resc', [ -0.25, 1.25 ],
+  #'log_rad2_resc', [ -0.25, 1.25 ],
+  'logTanom', [ -0.5, 0.5 ],
   'log_blendFlux', [ -6.0, 2.0 ])
   
 

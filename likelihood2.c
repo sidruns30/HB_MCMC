@@ -130,6 +130,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
   double lowerval = 0.0;
   double area,d,Am = 0.;
   double rr1,rr2;
+  double logTanom;
   double Amag1[Nt], Amag2[Nt];
   double pos[] = {1,0,0,-1,0,0};
   double Tcoeff[] = {3.74677,0.557556,0.184408,-0.0640800,-0.0359547};
@@ -148,6 +149,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
   Flux_TESS = pow(10.,Flux_TESS);
   rr1 = pow(10.,pars[9]);
   rr2 = pow(10.,pars[10]);
+  logTanom = pars[11];
   Mtot = (M1+M2)*MSUN;
   a = pow(G*Mtot*P*P/(4.0*PI*PI),1./3.);
   //P = sqrt(4.0*PI*PI*a*a*a/(G*Mtot));
@@ -169,8 +171,9 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
   M2 = pow(10.,M2);
   R1 = pow(10.,R1)*rr1;
   R2 = pow(10.,R2)*rr2;
-  Teff1 = pow(10.,Teff1)/5580.;
-  Teff2 = pow(10.,Teff2)/5580.;
+  
+  Teff1 = pow(10.,Teff1+logTanom/2)/5580.;
+  Teff2 = pow(10.,Teff2-logTanom/2)/5580.;
 
   Flux1 = PI*R1*R1*pow(Teff1,4.);
   Flux2 = PI*R2*R2*pow(Teff2,4.);
@@ -185,6 +188,13 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
     //convert back to Agnieszka units
     Mtot = M1+M2;
     aR = a/RSUN;
+    //John says: I get 1.2128e-3*B where B is the beaming factor, according to arxiv.org/2007.15715
+    //B for most stars (incl main seq and WD) ranges from about 6 for Teff=10^3.5 to 1 for Teff=10^4.7
+    //By eye, I estimate that their curve is close to
+    //   B ~ | 8*(4-log10(Teff))+2   if log10(Teff)<4
+    //       | 2-2*(log10(Teff)-4)   if 4<log10(Teff)<4.5
+    //       | 1                     if log10(Teff)>4.5
+    // I get that below is consistent with B=2.3, thus Teff~9200
     Adoppler = 2.8e-3*alphabeam*sin(inc)*pow(Pdays,-1./3)*pow(Mtot,-2./3.)*M1*zdot;
     Aellipse_phi = -alphaev*(M1/M2)*sin(inc)*sin(inc)*cos(2.*theta)*R2*R2*R2/(rr*rr*rr);
     Am = (1./9.)*alphaev*(2.+5.*M1/M2)*(2.-3.*sin(inc)*sin(inc))*R2*R2*R2/(aR*aR*aR);
