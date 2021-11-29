@@ -3,6 +3,18 @@ New version of likelihood that uses results from Engel et al 2020 to
 calculate the lightcurve. Equations are initally derived in Kopal 1958
 chapter 4, refined by Morris and then by Engel. The model includes
 tidal distortion, rotational flattening, reflection and eclipses.
+
+The parameters and their units are:
+M1:             Mass of star 1 (log Msun)
+M2:             Mass of star 2 (log Msun)
+P:              Period (log days)
+e:              Eccentricity
+inc:            Inclination (radians)
+Omega:          Longitude of ascending node (radians)
+omega0:         Argument of periapse (radians)
+T0:             Phase of the lightcurve (days)
+rr1:            Radius scaling factor for star 1; R1 ~ R1_i x 10^(rr1)
+rr2:            Radius scaling factor for star 2
 */
 
 #include <math.h>
@@ -22,6 +34,84 @@ tidal distortion, rotational flattening, reflection and eclipses.
 #define SQR(x) ((x)*(x))
 #define CUBE(x) ((x)*(x)*(x))
 #define QUAD(x) ((x)*(x)*(x)*(x))
+
+/*
+Auxiliary functions to remove median from an array
+The first 3 functions are necessary for quicksort
+Borrowed from 
+Parameters:
+    arr1        orginal array
+    Nt          Number of points in array
+*/
+void swap(double* a, double* b) 
+{ 
+    double t = *a; 
+    *a = *b; 
+    *b = t; 
+} 
+
+/* This function takes last element as pivot, places 
+the pivot element at its correct position in sorted 
+array, and places all smaller (smaller than pivot) 
+to left of pivot and all greater elements to right 
+of pivot */
+double partition (double arr[], int low, int high) 
+{ 
+    double pivot = arr[high]; // pivot 
+    int i = (low - 1); // Index of smaller element and indicates the right position of pivot found so far
+  
+    for (int j = low; j <= high - 1; j++) 
+    { 
+        // If current element is smaller than the pivot 
+        if (arr[j] < pivot) 
+        { 
+            i++; // increment index of smaller element 
+            swap(&arr[i], &arr[j]); 
+        } 
+    } 
+    swap(&arr[i + 1], &arr[high]); 
+    return (i + 1); 
+} 
+
+/* The main function that implements QuickSort 
+arr[] --> Array to be sorted, 
+low --> Starting index, 
+high --> Ending index */
+void quickSort(double arr[], int low, int high) 
+{ 
+    if (low < high) 
+    { 
+        /* pi is partitioning index, arr[p] is now 
+        at right place */
+        int pi = partition(arr, low, high); 
+  
+        // Separately sort elements before 
+        // partition and after partition 
+        quickSort(arr, low, pi - 1); 
+        quickSort(arr, pi + 1, high); 
+    } 
+} 
+  
+
+void remove_median(double *arr, long Nt){
+    // First sort the orignal array
+    double *sorted_arr;
+    sorted_arr = (double *)malloc(Nt*sizeof(double));
+
+    for (int i=0; i<Nt; i++) {sorted_arr[i] = arr[i];}
+
+    quickSort(sorted_arr, 0, Nt - 1); 
+
+    int mid;
+    if (Nt % 2 == 0) mid = (int) Nt/2;
+    else mid = (int) Nt/2 + 1;
+    
+    double median = sorted_arr[mid];
+
+    for (int i=0; i<Nt; i++) {arr[i] -= median;}
+    free(sorted_arr);
+}
+
 
 /*
 Trajectory calculator - recursively solve Kepler's equation using orbital
@@ -51,9 +141,9 @@ void traj(double t, double pars[], int i, double *X1, double *X2, double *Y1, do
     M2 = pow(10.,pars[1])*MSUN;
     P = pow(10.,pars[2])*SEC_DAY;
     e = pars[3];
-    inc = pars[4]*(PI/180.);
-    Omega = pars[5]*(PI/180.);
-    omega0 = pars[6]*(PI/180.);
+    inc = pars[4];
+    Omega = pars[5];
+    omega0 = pars[6];
     T0 = pars[7]*SEC_DAY;
 
     Mtot = M1+M2;
@@ -84,6 +174,7 @@ void traj(double t, double pars[], int i, double *X1, double *X2, double *Y1, do
     double YY = r*(sin_Omega*cos_omega0_f + cos_Omega*sin_omega0_f*cos_inc);
     double ZZ = r*sin_omega0_f*sin_inc;
 
+    // Note that these are in cgs
     *X1 = XX*(M2/Mtot);
     *Y1 = YY*(M2/Mtot);
     *Z1 = ZZ*(M2/Mtot);
@@ -92,11 +183,32 @@ void traj(double t, double pars[], int i, double *X1, double *X2, double *Y1, do
     *Z2 = -ZZ*(M1/Mtot);
     *rr = r;
     *ff = f;
-
-    //printf("X1: %f \t Y1 %f \t Z1 %f \t X2 %f \t Y2 %f \t Z2 %f \t r %f \t nu %f \n",
-    //        *X1/RSUN, *Y1/RSUN, *Z1/RSUN, *X2/RSUN, *Y2/RSUN, *Z2/RSUN, *rr/RSUN, *ff);
     return;
 }
+
+/*
+Function to calculate alpha beam
+Values taken from Fig 5 (Claret et. al 2020: Doppler beaming factors for white dwarfs
+                        main sequence stars and giant stars)
+Using values for g=5
+Input: log Temperature in Kelvin [NOT NORMALIZED BY SOLAR TEMP]
+*/
+double get_alpha_beam(double logT){
+
+    // Initializing the alpha and temperature values
+    double alphas[4] = {6.5, 4.0, 2.5, 1.2};
+    double logTs[4] = {3.5, 3.7, 3.9, 4.5};
+
+    // Return endpoints if temperature is outside the domain
+    if (logT > logTs[4]) return 1.2/4;
+    if (logT < logTs[0]) return 6.5/4;
+
+    int j = 4;
+    while(logT < logTs[j]) j--;
+
+    return (alphas[j+1] + (alphas[j+1] - alphas[j]) / (logTs[j+1] - logTs[j]) * (logT - logTs[j+1]))/4;
+}
+
 
 /*
 Beaming function. Taken from Engel et. al 2020
@@ -140,12 +252,9 @@ Note that the gravity (tau) and limb (mu) darkenening coefficients
 are set in the function
 */
 double ellipsoidal(double P, double M1, double M2, double e, double inc,
-                double omega0, double nu, double R1, double a){
+                double omega0, double nu, double R1, double a, double mu, double tau){
 
-    double mu = 1.;
-    double tau = 1.;
-
-    double alpha_11 = 15 * mu * (2 + tau) / (32 * (32 - mu));
+    double alpha_11 = 15 * mu * (2 + tau) / (32 * (3 - mu));
     double alpha_21 = 3 * (15 + mu) * (1 + tau) / (20 * (3 - mu));
     double alpha_2b1 = 15 * (1 - mu) * (3 + tau) / (64 * (3 - mu));
     double alpha_01 = alpha_21 / 9;
@@ -155,45 +264,44 @@ double ellipsoidal(double P, double M1, double M2, double e, double inc,
 
     double beta = (1 + e * cos(nu)) / (1 - SQR(e));
     double q = M2 / M1;
-    // Angular velocity at the periapse
+    // Rotational velocity = Angular velocity at the periapse
     double Prot = P * pow(1 - e, 3./2);
 
-    // Constant terms (can be turned off with the flag below)
-    double CONS1, CONS2, CONS3;
+    // "Mean ellipsoidal terms"
+    double AM1, AM2, AM3;
     // Sin terms 
     double S1, S3;
     // Cosine terms
     double C2_1, C2_2, C4;
 
     double ppm = 1.e-6;
-    // Flag to include const terms in flux
+    // Flag to include higher order terms in flux
     int enable_const = 1;
     double tot_flux = 0.;
 
-    if (enable_const == 1){
-        double SMALL = 1.e-5;
-        CONS1 = 13435 * 2 * alpha_01 * (2 - 3*SQR(sin(inc))) * CUBE(R1) / (M1 * SQR(Prot));
-        CONS2 = 13435 * 2 * alpha_01 * (2 - 3*SQR(sin(inc))) * q / (1 - q + SMALL) * CUBE(beta*R1) / (M1 * SQR(Prot));
-        CONS3 = 759 * alpha_0b1 * (8 - 40*SQR(sin(inc)) + 35*QUAD(sin(inc))) * pow(M1, -5./3) * q / pow(1+q, 5./3)
-                * pow(P, -10./3) * pow(beta * R1, 5);
-
-        tot_flux += (CONS1 + CONS2 + CONS3) * ppm;
-    }
-
-    S1 = 3194 * alpha_11 * (4 * sin(inc) - 5 * CUBE(sin(inc))) * pow(M1, -4./3) * q / pow(1+q, 4./3) * pow(P, -8./3)
-            * QUAD(beta * R1) * sin(omega0 + nu);
-    C2_1 = 13435 * alpha_21 * SQR(sin(inc)) * q / (1 + q) * CUBE(beta * R1) / (M1 * SQR(P)) * cos(2*(omega0 + nu));
-    C2_2 =  759 * alpha_2b1 * (6*SQR(sin(inc)) - 7*QUAD(sin(inc))) * pow(M1, -5./3) * q / pow(1+q, 5./3) * pow(P, -10./3)
-            * (beta * R1) * QUAD(beta * R1) * cos(2*(omega0 + nu));
-    S3 = 3194 * alpha_31 * CUBE(sin(inc)) * pow(M1, -4./3) * q / pow(1+q, 4./3) * pow(P, -8./3) * QUAD(beta * R1) 
-            * sin(3*(omega0 + nu));
-    C4 = 759 * alpha_41 * QUAD(sin(inc)) * pow(M1, -5./3) * q / pow(1+q, 5./3) * pow(P, -10./3) * (beta * R1) *
-            QUAD(beta * R1) * cos(4*(omega0 + nu));
-
-    tot_flux += (S1 + C2_1 + C2_2 + S3 + C4) * ppm;
+    // First the lowest order Engel Terms
+    AM1 = 13435 * 2 * alpha_01 * (2 - 3*SQR(sin(inc))) * (1 / M1) * (1 / SQR(Prot)) * CUBE(R1);
+    AM2 = 13435 * 3 * alpha_01 * (2 - 3*SQR(sin(inc))) * (1 / M1) * q / (1 + q) * (1 / SQR(P)) * CUBE(beta*R1);
+    C2_1 = 13435 * alpha_21 * SQR(sin(inc)) * (1 / M1) * q / (1 + q) * (1 / SQR(P)) * CUBE(beta * R1) * cos(2*(omega0 + nu));
     
-    //printf("Cons1 %f \t Cons2 %f \t Cons3 %f \t S1 %f \t C21 %f \t C22 %f \t S3 %f \t C4 %f \n", 
-    //        CONS1, CONS2, CONS3, S1, C2_1, C2_2, S3, C4);
+    tot_flux += (AM1 + AM2 + C2_1) * ppm;
+
+    if (enable_const == 1){
+        AM3 = 759 * alpha_0b1 * (8 - 40*SQR(sin(inc)) + 35*QUAD(sin(inc))) * pow(M1, -5./3) * q / pow(1+q, 5./3)
+        * pow(P, -10./3) * pow(beta * R1, 5);
+        S1 = 3194 * alpha_11 * (4 * sin(inc) - 5 * CUBE(sin(inc))) * pow(M1, -4./3) * q / pow(1+q, 4./3) * pow(P, -8./3)
+        * QUAD(beta * R1) * sin(omega0 + nu);
+        C2_2 =  759 * alpha_2b1 * (6*SQR(sin(inc)) - 7*QUAD(sin(inc))) * pow(M1, -5./3) * q / pow(1+q, 5./3) * pow(P, -10./3)
+                * (beta * R1) * QUAD(beta * R1) * cos(2*(omega0 + nu));
+        S3 = 3194 * alpha_31 * CUBE(sin(inc)) * pow(M1, -4./3) * q / pow(1+q, 4./3) * pow(P, -8./3) * QUAD(beta * R1) 
+                * sin(3*(omega0 + nu));
+        C4 = 759 * alpha_41 * QUAD(sin(inc)) * pow(M1, -5./3) * q / pow(1+q, 5./3) * pow(P, -10./3) * (beta * R1) *
+                QUAD(beta * R1) * cos(4*(omega0 + nu));
+
+        tot_flux += (AM3 + S1 + C2_2 + S3 + C4) * ppm;
+    }
+    
+
     return tot_flux; 
 }
 
@@ -248,6 +356,7 @@ double eclipse_area(double R1, double R2,
     // Overlap function borrowed from likelihood2.c
     double d = sqrt(SQR(X2-X1) + SQR(Y2-Y1))/RSUN;
     
+    // Function is call by value so values of R1 and R2 aren't swapped in main code
     if (R2 > R1) {
         double temp_ = R1;
         R1 = R2;
@@ -259,12 +368,12 @@ double eclipse_area(double R1, double R2,
     dc = sqrt(R1*R1-R2*R2);
     // Now find the observed overlapping area between the two stars
     if (d >= (R1+R2)) area = 0.;
-    if (d < (R1-R2)) area = PI*R2*R2; // Shouldn't it be R1^2
+    if (d < (R1-R2)) area = PI*R2*R2;
 
     if ((d > dc)&(d < (R1+R2))) { 
         h_sq = (4.*d*d*R1*R1- SQR(d*d-R2*R2+R1*R1))/(4.*d*d);
         h = sqrt(h_sq);
-        // Ask Jeremy about Arh
+
         double Arh1 = R1*R1*asin(h/R1)-h*sqrt(R1*R1-h*h);
         double Arh2 = R2*R2*asin(h/R2)-h*sqrt(R2*R2-h*h);
         area = Arh1 + Arh2;
@@ -310,16 +419,17 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     double P = pow(10., pars[2])*SEC_DAY;
     double Pdays = pow(10., pars[2]);
     double e = pars[3];
-    double inc = pars[4]*(PI/180);
-    double Omega = pars[5]*(PI/180);
-    double omega0 = pars[6]*(PI/180);
+    double inc = pars[4];
+    double Omega = pars[5];
+    double omega0 = pars[6];
     double T0 = pars[7]*SEC_DAY;
-    double Flux_TESS = pow(10., pars[8]);
-    double rr1 = pow(10., pars[9]);
-    double rr2 = pow(10., pars[10]);
+    double rr1 = pow(10., pars[8]);
+    double rr2 = pow(10., pars[9]);
 
     double M1 = pow(10., logM1);
     double M2 = pow(10., logM2);
+
+    int compute_alpha_beam = 0;
 
     // Compute effective temperature and radius
     double Tcoeff[] = {3.74677,0.557556,0.184408,-0.0640800,-0.0359547};
@@ -332,11 +442,17 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
         R2 += Rcoeff[j]*pow(logM2,j);
         Teff2 += Tcoeff[j]*pow(logM2,j);
     }
+
     // [Units are Rsun and K respectively]
     R1 = pow(10.,R1)*rr1;
     R2 = pow(10.,R2)*rr2;
     Teff1 = pow(10.,Teff1)/5580.;
     Teff2 = pow(10.,Teff2)/5580.;
+
+    // Flux normalization coefficients
+    double Norm1, Norm2;
+    Norm1 = SQR(R1) * QUAD(Teff1) / (SQR(R1) * QUAD(Teff1) + SQR(R2) * QUAD(Teff2));
+    Norm2 = SQR(R2) * QUAD(Teff2) / (SQR(R1) * QUAD(Teff1) + SQR(R2) * QUAD(Teff2));
 
     // Semi majot axis (cgs calculation)
     double Mtot = (M1+M2)*MSUN;
@@ -379,36 +495,54 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
         Amag2[i] = 0.;
 
         // Beaming and reflection coefficients
-        double alpha_beam = 1.;
+        double alpha_beam_1 = 1.;
+        double alpha_beam_2 = 1.;
         double alpha_ref = 1.;
+        double mu = .16;
+        double tau = .344;
 
-        double beam1 = beaming(Pdays, M1, M2, e, inc, omega0, nu_arr[i], alpha_beam);
-        double ellip1 = ellipsoidal(Pdays, M1, M2, e, inc, omega0, nu_arr[i], R1, ar);
+        if (compute_alpha_beam == 1) {
+            alpha_beam_1 = get_alpha_beam(log10(Teff1 * 5580));
+            alpha_beam_2 = get_alpha_beam(log10(Teff2 * 5580));
+            }
+
+        double beam1 = beaming(Pdays, M1, M2, e, inc, omega0, nu_arr[i], alpha_beam_1);
+        double ellip1 = ellipsoidal(Pdays, M1, M2, e, inc, omega0, nu_arr[i], R1, ar, mu, tau);
         double ref1 = reflection(Pdays, M1, M2, e, inc, omega0, nu_arr[i], R2, alpha_ref);
 
-        Amag1[i] = beam1 + ellip1 + ref1;
+        Amag1[i] = Norm1 * (1 + beam1 + ellip1 + ref1);
 
-        double beam2 = beaming(Pdays, M2, M1, e, inc, (omega0+PI), nu_arr[i], alpha_beam);
-        double ellip2 = ellipsoidal(Pdays, M2, M1, e, inc, (omega0+PI), nu_arr[i], R1, ar);
-        double ref2 = reflection(Pdays, M2, M1, e, inc, (omega0+PI), nu_arr[i], R2, alpha_ref);
+        double beam2 = beaming(Pdays, M2, M1, e, inc, (omega0+PI), nu_arr[i], alpha_beam_2);
+        double ellip2 = ellipsoidal(Pdays, M2, M1, e, inc, (omega0+PI), nu_arr[i], R2, ar, mu, tau);
+        double ref2 = reflection(Pdays, M2, M1, e, inc, (omega0+PI), nu_arr[i], R1, alpha_ref);
 
-        Amag2[i] = beam2 + ellip2 + ref2;
+        Amag2[i] = Norm2 * (1 + beam2 + ellip2 + ref2);
 
-        // Eclipse contribution
+        // Eclipse contribution (delta F = F * (ecl area / tot area))
         double area = eclipse_area(R1, R2, X1_arr[i], X2_arr[i], Y1_arr[i], Y2_arr[i]);
-        if (Z2_arr[i] > Z1_arr[i]) Amag2[i] -= area*QUAD(Teff2);
-        else if (Z2_arr[i] < Z1_arr[i]) Amag1[i] -= area*QUAD(Teff1);
+        if (Z2_arr[i] > Z1_arr[i]) Amag2[i] -= area * Norm2 / (PI * SQR(R2));
+        else if (Z2_arr[i] < Z1_arr[i]) Amag1[i] -= area * Norm1 / (PI * SQR(R1));
 
-        // Full lightcurve, scaled by both the stars
-        template[i] = (Amag1[i] + Amag2[i]) * Flux_TESS;
-        //printf("r value %f \t X1 value %f \t nu value %f \n", r_arr[i], X1_arr[i],  nu_arr[i]);
-        //printf("beam1 %f \t ellip 1 %f \t ref 1 %f \t beam 2 %f \t ellip2 %f \t ref 2 %f \t",
-        //        beam1, ellip1, ref1, beam2, ellip2, ref2);
-        //if (Z2_arr[i] > Z1_arr[i]) printf("Ecl 1 %f \n ", area*QUAD(Teff2));
-        //else if (Z2_arr[i] < Z1_arr[i]) printf("Ecl 2 %f \n", area*QUAD(Teff1));
-        //else printf("\n");
-    }   
+        // Full lightcurve
+        template[i] = (Amag1[i] + Amag2[i]);
+    } 
+
+    // Normalize the lightcurve
+    remove_median(template, Nt);
+    for (int i=0; i<Nt; i++) template[i] += 1;
+
+    // Write lightcurve to a file
+    FILE *lc_file;
+    char* lc_file_name = "output_lc.txt";
+
+    lc_file = fopen(lc_file_name,"w");
+
+    for (int i=0; i<Nt; i++){
+        fprintf(lc_file,"%lf\t%lf\n",times[i], template[i]);
+    }
+    fclose(lc_file);
 }
+
 
 /*
 Likelihood Calculator
@@ -454,3 +588,18 @@ double loglikelihood(double time[], double data[], double noise[],
   return(-chi2/2.0);
 }
 
+int main(){
+
+    double pars[10] = {1.1843, 0.8549, .7, 0.35047, 1.562449, 0.950066, 2.7987, 0., -0.1037027,-0.542256};
+    double Pdays = pow(10., pars[2]);
+    int Nt = 1000;
+
+    double *times = malloc(Nt * sizeof(double));
+    double *template = malloc(Nt * sizeof(double));
+    for (int i=0; i<Nt; i++){
+        times[i] = 3 * Pdays * (double)i / (double)Nt;
+    }
+
+    calc_light_curve(times, Nt, pars, template);
+    return 0;
+}

@@ -1,5 +1,5 @@
 /*********************************************************/
-//similar to mcmc_wrapper.c, but uses likelihood2.c,
+//similar to mcmc_wrapper.c, but uses likelihood3.c,
 //with independently varying R1,R2
 //instead of using main sequence scaling relations
 /*********************************************************/
@@ -10,12 +10,11 @@
 #include <time.h>
 #include <omp.h>
 #include<unistd.h>
-#include "likelihood2.c"
+#include "likelihood3.c"
 
 #define NPARAMS 11
 #define NCHAINS 50
 #define NPAST   500
-#define SIGMAP 1.0e-1
 #define GAMMA (2.388/sqrt(2.*NPARAMS))
 #define NUM_ELEMENTS(x) (size_of(x)/size_of(x[0]))
 
@@ -23,6 +22,9 @@ typedef struct {
   double lo;
   double hi;
 } bounds;
+
+/*Change SIGMAP if necessary*/
+double SIGMAP;
 
 /* From likelihood.c */
 void calc_light_curve(double t_data[], long Nt, double P_[], double light_curve[]);
@@ -88,19 +90,19 @@ void set_limits(bounds limited[], bounds limits[])
   limits[7].hi = 1000.;
   //limits on log Flux0, in TESS counts
   limited[8].lo = 1;
-  limits[8].lo = -5.0;
+  limits[8].lo = -10.0;
   limited[8].hi = 1.;
-  limits[8].hi = 5.0;
+  limits[8].hi = 10.0;
   //limits on log rr1, the scale factor for R1
   limited[9].lo = 1;
-  limits[9].lo = -2.0;
+  limits[9].lo = 0;
   limited[9].hi = 1.;
-  limits[9].hi = 2.0;
+  limits[9].hi = 1.0;
   //limits on log rr2, the scale factor for R2
   limited[10].lo = 1;
-  limits[10].lo = -2.0;
+  limits[10].lo = 0.;
   limited[10].hi = 1.;
-  limits[10].hi = 2.0;
+  limits[10].hi = 1.;
 }
 
 /* Siddhant: Functions to free memory from arrays */
@@ -167,7 +169,9 @@ int main(int
   long Nt,Nstart,Nstop,subN,obs_id,nch;
   long acc;                       
   long iter,TICid;                
-  int *index, burn_in;            
+  int *index, burn_in;
+  double ls_period;  
+  double SIGMAP;        
 
   bounds limited[NPARAMS], limits[NPARAMS];
   FILE *param_file, *data_file, *chain_file, *logL_file;
@@ -177,11 +181,16 @@ int main(int
         logLname[80]="", RUN_ID[11]="";
   //characteristic magnitude of MCMC step in each parameter
   double  *sigma;
-  
+
   Niter = (long)atoi(argv[1]);
   strcpy(RUN_ID,argv[2]);
   true_err = (double)atof(argv[3]);
   burn_in = atoi(argv[4]);
+  ls_period = (double)atof(argv[5]);
+
+  // Set period search
+  if (burn_in == 2) {SIGMAP = 1.e-10;}
+  else              {SIGMAP = 1.e-1;}
 
   strcat(subparname,"../subpars/subpar.");
   strcat(subparname,RUN_ID);
@@ -199,10 +208,19 @@ int main(int
   strcat(outname,RUN_ID);
   strcat(outname,".out");
   printf("%s\n",parname);
-  strcpy(dfname,"../lightcurves/folded_lightcurves/");                // TESS data file
+
+  /*Use binned period if period is found, otherwise use the full lightcurve*/
+  if (burn_in == 2){
+  strcpy(dfname,"../lightcurves/folded_lightcurves/");
   strcat(dfname,RUN_ID);
-  //strcat(dfname,".txt");            // complete data set
-  //strcat(dfname,".bin");          // binned data
+  strcat(dfname,"_new.txt");
+  }
+  else {
+    strcpy(dfname,"../lightcurves/original/");
+    strcat(dfname,RUN_ID);
+    strcat(dfname,".txt");
+  }
+
 
   P_ = (double **)malloc(NCHAINS*sizeof(double));
   for(i=0;i<NCHAINS;i++) P_[i]=(double *)malloc(NPARAMS*sizeof(double));
@@ -232,10 +250,21 @@ int main(int
   set_limits(limited,limits);
   //set up proposal distribution
   initialize_proposals(sigma, history);
+  
+  int param_file_flag = 0;
   /* Siddhant: Initializing the chain parameters*/
   for (i=0;i<NPARAMS;i++) {
-    if (exists(parname)){fscanf(param_file,"%lf\n", &tmp);}
-    else tmp = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);  // Assign random parameters
+    if (exists(parname)){
+      fscanf(param_file,"%lf\n", &tmp); 
+      printf("Par %d value: %.5e \n",i, tmp);
+      param_file_flag = 1;
+      }
+  
+    else {
+      tmp = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
+      printf("\t assinging random pars \n");
+      }
+
     P_[0][i] = tmp;
     P_0[i]   = tmp;
     x[0][i]  = P_[0][i];
@@ -244,61 +273,113 @@ int main(int
       P_[j][i] = P_[0][i];
       x[j][i]  = P_[0][i];
     }
+
     if (burn_in == 1) {
       for(j=0; j<NCHAINS; j++) {
-	      P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
-	      x[j][i]  = P_[j][i];
+        if (param_file_flag != 1){
+          P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
+          x[j][i]  = P_[j][i];
+        }
+        
       }
     }
 
     if (burn_in == 2) {
       for(j=0; j<NCHAINS; j++) {
-	      P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
-	      if (i == 2) P_[j][i] = P_0[i];  // Keep the period
-	      x[j][i]  = P_[j][i];
+        if (param_file_flag != 1){
+          P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
+          if (i == 2) P_[j][i] = ls_period;  // Keep the period
+          if (i == 7) P_[j][i] = 0;          // Set T0 = 0
+          x[j][i]  = P_[j][i];
+        }
       }
     }
   }
-  if (exists(parname)){fclose(param_file);}
-  /* Read TESS data file */
-  data_file = fopen(dfname,"r");
-  tmp = 0;
-  fscanf(data_file,"%ld\n", &Nt);
-  Nt = 2*Nt;
-  subN         = 0;
-  rdata        = (double *)malloc(3*Nt*sizeof(double));
-  index        = (int *)malloc(NCHAINS*sizeof(int));
 
-  for (i=0;i<Nt;i++) {
-    fscanf(data_file,"%lf\t%lf\t%lf\n", &tmp1, &tmp2, &tmp3);
-    rdata[i*3]=tmp1;
-    rdata[i*3+1]=tmp2;
-    rdata[i*3+2]=tmp3;
-    subN++;
-    //rdata[i*4+3]=tmp4;
-    //if (tmp4 == 0) subN++;
-  }
-  printf("Closing data file \n");
-  fclose(data_file);
+  if (burn_in == 1){
+      printf("Test6 \n");
+      printf("Dfname:");
+      //printf("%s", dfname);
+    if (exists(parname)){fclose(param_file);}
+    /* Read binned data file */
+    printf("Opening data file %s", dfname);
+    data_file = fopen(dfname,"r");
+    tmp = 0;
+    fscanf(data_file,"%ld\n", &Nt);
+    subN         = 0;
+    rdata        = (double *)malloc(4*Nt*sizeof(double));
+    index        = (int *)malloc(NCHAINS*sizeof(int));
 
-  a_data       = (double *)malloc(subN*sizeof(double));
-  a_model      = (double *)malloc(subN*sizeof(double));
-  t_data       = (double *)malloc(subN*sizeof(double));
-  e_data       = (double *)malloc(subN*sizeof(double));
-  q_data       = (double *)malloc(subN*sizeof(double));
-  light_curve  = (double *)malloc(subN*sizeof(double));
-  light_curve2 = (double *)malloc(subN*sizeof(double));
-
-  subi = 0;
-  for (i=0;i<Nt;i++) {
-    // tmp4 = rdata[i*4+3];
-    //if (tmp4 == 0) {
-    t_data[subi] = rdata[i*3]; 
-    a_data[subi] = rdata[i*3+1]; 
-    e_data[subi] = rdata[i*3+2];// sqrt(rdata[i*4+1])*true_err;
-    subi++;
-    //}
+    printf("Test7 \n");
+    for (i=0;i<Nt;i++) {
+      fscanf(data_file,"%lf %lf %lf %lf\n", &tmp1, &tmp2, &tmp3, &tmp4);
+      rdata[i*4]=tmp1;
+      rdata[i*4+1]=tmp2;
+      rdata[i*4+2]=tmp3;
+      rdata[i*4+3]=tmp4;
+      if (tmp4 == 0) subN++;
+    }
+    printf("Closing data file \n");
+    fclose(data_file);
+    
+    a_data       = (double *)malloc(subN*sizeof(double));
+    a_model      = (double *)malloc(subN*sizeof(double));
+    t_data       = (double *)malloc(subN*sizeof(double));
+    e_data       = (double *)malloc(subN*sizeof(double));
+    q_data       = (double *)malloc(subN*sizeof(double));
+    light_curve  = (double *)malloc(subN*sizeof(double));
+    light_curve2 = (double *)malloc(subN*sizeof(double));
+    
+    subi = 0;
+    for (i=0;i<Nt;i++) {
+      tmp4 = rdata[i*4+3];
+      if (tmp4 == 0) {
+      t_data[subi] = rdata[i*4]; 
+      a_data[subi] = rdata[i*4+1]; 
+      e_data[subi] = sqrt(rdata[i*4+1])*true_err;
+      subi++;
+      }
   }      
+  }
+
+  else if (burn_in == 2){
+    if (exists(parname)){fclose(param_file);}
+    printf("Opening folded lc data file %s \n", dfname);
+    /* Read binned data file */
+    data_file = fopen(dfname,"r");
+    tmp = 0;
+    fscanf(data_file,"%ld\n", &Nt);
+    Nt = Nt;
+    subN         = 0;
+    rdata        = (double *)malloc(3*Nt*sizeof(double));
+    index        = (int *)malloc(NCHAINS*sizeof(int));
+
+    for (i=0;i<Nt;i++) {
+      fscanf(data_file,"%lf\t%lf\t%lf\n", &tmp1, &tmp2, &tmp3);
+      rdata[i*3]=tmp1;
+      rdata[i*3+1]=tmp2;
+      rdata[i*3+2]=tmp3;
+      subN++;
+    }
+    printf("Closing data file \n");
+    fclose(data_file);
+
+    a_data       = (double *)malloc(subN*sizeof(double));
+    a_model      = (double *)malloc(subN*sizeof(double));
+    t_data       = (double *)malloc(subN*sizeof(double));
+    e_data       = (double *)malloc(subN*sizeof(double));
+    q_data       = (double *)malloc(subN*sizeof(double));
+    light_curve  = (double *)malloc(subN*sizeof(double));
+    light_curve2 = (double *)malloc(subN*sizeof(double));
+    
+    for (subi=0;subi<Nt;subi++) {
+      t_data[subi] = rdata[subi*3]; 
+      a_data[subi] = rdata[subi*3+1]; 
+      e_data[subi] = rdata[subi*3+2];
+  }
+  }
+
+
 	
   // initialize parallel tempering
   /* Siddhant: what is dtemp and why is it set to an arbitrary value like this */
@@ -315,9 +396,10 @@ int main(int
 
   //initialize likelihood
   logLmap = loglikelihood(t_data,a_data,e_data,subN,P_[0]);
-  printf("initial chi2 %g\n",-2*logLmap);
 
-  for(i=0; i<NCHAINS; i++) logLx[i] = logLmap;
+  printf("initial chi2 %g\n",-2*logLmap);
+ 
+  //for(i=0; i<NCHAINS; i++) logLx[i] = logLmap;
 
   acc=0;
   printf("Creating chain and log files \n");
@@ -399,11 +481,11 @@ int main(int
     }
     /********Chain Loop ends**********/
     // Call timer after 10 iterations
-    if (iter%10 == 9){
-      end = clock();
-      double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-      printf("time spent in the last 10 iterations: %f \n", time_spent);
-      }
+    //if (iter%10 == 9){
+    //  end = clock();
+    //  double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    //  printf("time spent in the last 10 iterations: %f \n", time_spent);
+    //  }
 
     //update map parameters
     if (logLx[index[0]] > logLmap) {
@@ -427,7 +509,7 @@ int main(int
     }
     
     //update progress to screen
-    if(iter%10==0) {
+    if(iter%100==0) {
 	    printf("%ld/%ld logL=%.10g acc=%.3g DEacc=%.3g",iter,Niter,logLx[index[0]],
 	    (double)(acc)/((double)atrial),
 	    (double)DEacc/(double)DEtrial);

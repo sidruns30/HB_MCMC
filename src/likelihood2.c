@@ -17,6 +17,7 @@
 #define SQR(x) ((x)*(x))
 #define CUBE(x) ((x)*(x)*(x))
 #define QUAD(x) ((x)*(x)*(x)*(x))
+#define NPARS 11
 
 static inline void swap(double *x, double *y){
   double temp = *x;
@@ -145,7 +146,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
   double Amag1[Nt], Amag2[Nt];
   double pos[] = {1,0,0,-1,0,0};
   double Tcoeff[] = {3.74677,0.557556,0.184408,-0.0640800,-0.0359547};
-  double Rcoeff[] = {0.00158766,0.921233,-0.155659,-0.0739842,0.0581150};
+  double Rcoeff[] = {0.00158766,0.921233,-0.155659,-0.0739842,0.0581150}; // radius for 1 solar mass in log space
   int j,itime=0;
 
   // This removes 4 log10 calls:
@@ -187,7 +188,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
   Flux1 = PI*R1*R1*QUAD(Teff1);
   Flux2 = PI*R2*R2*QUAD(Teff2);
 
-  /*Siddhant: taking out all the redundant function calls from the loop*/
+  /*Siddhant: taking out all the redundant function calls from the loop*/ // dont want r1+r2 > a(1-e)
   //convert back to Agnieszka units
   Mtot = M1+M2;
   aR = a/RSUN;
@@ -218,7 +219,6 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
     Aellipse_mean = Aellipse_mean/(CUBE(1.0-e*e));
     Amag2[itime] = Flux2 * (Amag_limb + Adoppler + Aellipse_phi + Aellipse_mean);
     
-    /*Siddhant: why are we computing the same thing again? I might remove this*/
     /* For Amag 1*/
     Adoppler = -1 * Adoppler * M2 / M1; //-2.8e-3*alphabeam*sin(inc)*pow(Pdays,-1./3)*pow(Mtot,-2./3.)*M2*zdot;
     Aellipse_phi = -alphaev * (M2/M1) * SQR(sin_inc) * cos_2theta * CUBE(R1) / CUBE(rr);
@@ -255,13 +255,14 @@ double loglikelihood(double time[], double data[], double noise[],
   calc_light_curve(time,N,params,template);
 	
   //sum square of residual to get chi-squared
-  chi2 = 0;
+  chi2 = 0.;
   for (i=0;i<N;i++) 
-    {
+    { // bound on the noise:
+      if (noise[i] < 1.) {noise[i] = 1.e-5;}
       residual = (template[i]-data[i])/noise[i];
       chi2    += residual*residual;
-      //printf("%ld %12.5e %12.5e %12.5e\n",i,data[i],template[i],noise[i]);
     }
+  //printf("chain chi2 is: %.10e\n", chi2);
   //free memory
   free(template);
   
