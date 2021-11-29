@@ -7,7 +7,7 @@ matplotlib.use('agg')
 
 id = sys.argv[1]
 # Plot the lightcurves from the first 10000 chains of mcmc
-data_dir = os.getcwd() + "/../lightcurves/mcmc_lightcurves/"
+data_dir = os.getcwd() + "/../data/lightcurves/mcmc_lightcurves/"
 lc =  glob.glob(data_dir + id + ".out")[0]
 
 
@@ -63,9 +63,9 @@ try:
     plt.xlabel("Time", fontsize=15, family="serif")
     plt.ylabel("Flux", fontsize=15, family="serif")
     #plt.xlim((2225, 2255))
-    plt.ylim((0.95, 1.05))
+    #plt.ylim((0.95, 1.05))
     plt.grid(alpha=0.5)
-    plt.savefig(os.getcwd() + '/../figures/mcmc/model_lightcurve_%s.png' %id)
+    plt.savefig(os.getcwd() + '/../data/figures/mcmc/model_lightcurve_%s.png' %id)
     plt.close()
     print("Generated plot: %s" % id)
 except:pass

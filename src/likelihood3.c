@@ -476,6 +476,13 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     // True anomaly
     double nu_arr[Nt];
 
+    // Write lightcurve to a file
+    
+    /*FILE *lc_file;
+    char* lc_file_name = "output_lc.txt";
+    lc_file = fopen(lc_file_name,"w");
+    */
+
     // Calculate trajectory and store results in arrays + unitialize fluxes to 0
     for (int i = 0; i<Nt; i++){
         double t = times[i];
@@ -497,7 +504,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
         // Beaming and reflection coefficients
         double alpha_beam_1 = 1.;
         double alpha_beam_2 = 1.;
-        double alpha_ref = 1.;
+        double alpha_ref = .1;
         double mu = .16;
         double tau = .344;
 
@@ -525,22 +532,22 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
 
         // Full lightcurve
         template[i] = (Amag1[i] + Amag2[i]);
+
+        // For writing onto the file
+      /*  
+        double full_beam, full_ellip, full_ref;
+        full_beam = Norm1*beam1 + Norm2*beam2;
+        full_ellip = Norm1*ellip1 + Norm2*ellip2;
+        full_ref = Norm1*ref1 + Norm2*ref2;
+        fprintf(lc_file,"%lf\t%lf\t%lf\t%lf\t%lf\n",times[i], template[i], full_beam, full_ellip, full_ref);
+        */
     } 
 
     // Normalize the lightcurve
     remove_median(template, Nt);
     for (int i=0; i<Nt; i++) template[i] += 1;
 
-    // Write lightcurve to a file
-    FILE *lc_file;
-    char* lc_file_name = "output_lc.txt";
-
-    lc_file = fopen(lc_file_name,"w");
-
-    for (int i=0; i<Nt; i++){
-        fprintf(lc_file,"%lf\t%lf\n",times[i], template[i]);
-    }
-    fclose(lc_file);
+    //fclose(lc_file);
 }
 
 
@@ -586,20 +593,4 @@ double loglikelihood(double time[], double data[], double noise[],
   
   //return log likelihood
   return(-chi2/2.0);
-}
-
-int main(){
-
-    double pars[10] = {1.1843, 0.8549, .7, 0.35047, 1.562449, 0.950066, 2.7987, 0., -0.1037027,-0.542256};
-    double Pdays = pow(10., pars[2]);
-    int Nt = 1000;
-
-    double *times = malloc(Nt * sizeof(double));
-    double *template = malloc(Nt * sizeof(double));
-    for (int i=0; i<Nt; i++){
-        times[i] = 3 * Pdays * (double)i / (double)Nt;
-    }
-
-    calc_light_curve(times, Nt, pars, template);
-    return 0;
 }

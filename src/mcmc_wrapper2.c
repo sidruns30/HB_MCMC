@@ -12,7 +12,7 @@
 #include<unistd.h>
 #include "likelihood3.c"
 
-#define NPARAMS 11
+#define NPARAMS 10
 #define NCHAINS 50
 #define NPAST   500
 #define GAMMA (2.388/sqrt(2.*NPARAMS))
@@ -68,41 +68,36 @@ void set_limits(bounds limited[], bounds limits[])
   limits[3].lo = 0.0;
   limited[3].hi = 1;
   limits[3].hi = 1.;
-  //limits on inc, in degrees
+  //limits on inc, in rads
   limited[4].lo = 2;
-  limits[4].lo = -90.;
+  limits[4].lo = -PI/2;
   limited[4].hi = 2;
-  limits[4].hi = 90.;
-  //limits on Omega, in degrees
+  limits[4].hi = PI/2;
+  //limits on Omega, in rads
   limited[5].lo = 2;
-  limits[5].lo = -180.;
+  limits[5].lo = -PI;
   limited[5].hi = 2;
-  limits[5].hi = 180.;
-  //limits on omega0, in degrees
+  limits[5].hi = PI;
+  //limits on omega0, in rads
   limited[6].lo = 2;
-  limits[6].lo = -180;
+  limits[6].lo = -PI;
   limited[6].hi = 2;
-  limits[6].hi = 180.;
+  limits[6].hi = PI;
   //limits on T0, in MDJ-2450000
   limited[7].lo = 1;
   limits[7].lo = -1000;
   limited[7].hi = 1;
   limits[7].hi = 1000.;
-  //limits on log Flux0, in TESS counts
-  limited[8].lo = 1;
-  limits[8].lo = -10.0;
-  limited[8].hi = 1.;
-  limits[8].hi = 10.0;
   //limits on log rr1, the scale factor for R1
-  limited[9].lo = 1;
-  limits[9].lo = 0;
-  limited[9].hi = 1.;
-  limits[9].hi = 1.0;
+  limited[8].lo = 1;
+  limits[8].lo = 0;
+  limited[8].hi = 1.;
+  limits[8].hi = 1.0;
   //limits on log rr2, the scale factor for R2
-  limited[10].lo = 1;
-  limits[10].lo = 0.;
-  limited[10].hi = 1.;
-  limits[10].hi = 1.;
+  limited[9].lo = 1;
+  limits[9].lo = 0.;
+  limited[9].hi = 1.;
+  limits[9].hi = 1.;
 }
 
 /* Siddhant: Functions to free memory from arrays */
@@ -192,31 +187,31 @@ int main(int
   if (burn_in == 2) {SIGMAP = 1.e-10;}
   else              {SIGMAP = 1.e-1;}
 
-  strcat(subparname,"../subpars/subpar.");
+  strcat(subparname,"../data/subpars/subpar.");
   strcat(subparname,RUN_ID);
   strcat(subparname,".dat");
-  strcat(parname,"../pars/par.");
+  strcat(parname,"../data/pars/par.");
   strcat(parname,RUN_ID);
   strcat(parname,".dat");
-  strcat(chainname,"../chains/chain.");
+  strcat(chainname,"../data/chains/chain.");
   strcat(chainname,RUN_ID);
   strcat(chainname,".dat");
-  strcat(logLname,"../logL/logL.");
+  strcat(logLname,"../data/logL/logL.");
   strcat(logLname,RUN_ID);
   strcat(logLname,".dat");
-  strcat(outname,"../lightcurves/mcmc_lightcurves/");
+  strcat(outname,"../data/lightcurves/mcmc_lightcurves/");
   strcat(outname,RUN_ID);
   strcat(outname,".out");
   printf("%s\n",parname);
 
   /*Use binned period if period is found, otherwise use the full lightcurve*/
   if (burn_in == 2){
-  strcpy(dfname,"../lightcurves/folded_lightcurves/");
+  strcpy(dfname,"../data/lightcurves/folded_lightcurves/");
   strcat(dfname,RUN_ID);
   strcat(dfname,"_new.txt");
   }
   else {
-    strcpy(dfname,"../lightcurves/original/");
+    strcpy(dfname,"../data/lightcurves/original/");
     strcat(dfname,RUN_ID);
     strcat(dfname,".txt");
   }
