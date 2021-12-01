@@ -1,13 +1,12 @@
 cimport cython
 #cdef void calc_light_curve(double* times, double Nt, double*pars, double *template);
 import numpy as np
-cdef extern from "likelihood2.c":
-     void calc_light_curve(double* times, double Nt, double*pars, double *template);
-     pass
 
-#def lightcurve(times,double logMlens,double Mstar,double Pdays,double e,double sini,double omgf,double T0overP,double logFp50,double Fblend):
-def lightcurve(times,inpars):
-  logM1, logM2, logP_day, e, inc_deg, omega_deg,omega0_deg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale,logTanom,log_blendFlux=inpars
+cimport likelihood2
+cimport likelihood3
+
+def lightcurve2(times,inpars):
+  logM1, logM2, logP_day, e, inc_deg, omega_deg,omega0_deg, T0_day,log_rad1_rescale,log_rad2_rescale,logTanom,blend_frac,logFluxTESS=inpars
   cdef double pars[12]
   #need to convert angles from rad to deg here
   radeg=180/np.pi
@@ -17,10 +16,43 @@ def lightcurve(times,inpars):
   cdef double[:] ctimes = times
   cdef double[:] ctemplate=np.empty(Nt, dtype=np.double)
   #compute_lightcurve(&ctimes[0],&cAmags[0],Nt,&pars[0]);
-  calc_light_curve(&ctimes[0],Nt,&pars[0],&ctemplate[0]);
+  likelihood2.calc_light_curve(&ctimes[0],Nt,&pars[0],&ctemplate[0]);
   template=np.array(ctemplate)
   #return template+10**(log_blendFlux+logFluxTESS)
-  return template+10**log_blendFlux
+  Flux_TESS = 10.**logFlux_TESS
+  return 1*blend_frac + template*(1-blend_frac)
+
+
+def lightcurve3(times,inpars):
+  logM1, logM2, logP_day, e, inc_deg, omega_deg, T0_day, log_rad1_rescale, log_rad2_rescale, flux_tune, blend_frac=inpars
+  cdef double pars[12]
+  #need to convert angles from rad to deg here
+  radeg=180/np.pi
+  pars[:]=[  logM1, logM2, logP_day, e, inc_deg*radeg, omega_deg*radeg, 0, T0_day, log_rad1_rescale,log_rad2_rescale ]
+  times=np.array(times)
+  cdef int Nt=len(times)
+  cdef double[:] ctimes = times
+  cdef double[:] ctemplate=np.empty(Nt, dtype=np.double)
+  '''
+    c-code param definitions:
+
+    // Extract the paramters
+    double logM1 = pars[0];
+    double logM2 = pars[1];
+    // Period in seconds
+    double P = pow(10., pars[2])*SEC_DAY;
+    double Pdays = pow(10., pars[2]);
+    double e = pars[3];
+    double inc = pars[4];
+    double Omega = pars[5];
+    double omega0 = pars[6];
+    double T0 = pars[7]*SEC_DAY;
+    double rr1 = pow(10., pars[8]);
+    double rr2 = pow(10., pars[9]);
+  '''
+  likelihood3.calc_light_curve(&ctimes[0],Nt,&pars[0],&ctemplate[0]);
+  template=np.array(ctemplate)
+  return ( 1*blend_frac + template*(1-blendFlux) ) * fluxtune
 
 class parspace:
   def __init__(self, *args):
@@ -75,7 +107,25 @@ class parspace:
     return not np.all(np.logical_and(np.array(pars)>=self.mins, np.array(pars)<=self.maxs))
     
 
-sp=parspace(
+sp2=parspace(
+  'logM1', [ -1.5, 2.0 ],
+  'logM2', [ -1.5, 2.0 ],
+  'logP', [ -2.0, 3.0 ],
+  'e', [ 0, 1 ],
+  'inc', [ 0, np.pi ],
+  'Omega', [ -np.pi, np.pi ],
+  'Omega0', [ -np.pi, np.pi ],
+  'T0', [ -1000, 1000 ],
+  'log_rad1_resc', [ -2, 2 ],
+  'log_rad2_resc', [ -2, 2 ],
+  #'log_rad1_resc', [ -0.25, 1.25 ],
+  #'log_rad2_resc', [ -0.25, 1.25 ],
+  'logTanom', [ -0.5, 0.5 ],
+  'blend_frac', [ 0, 1.0 ],
+  'logFluxTESS', [ -10.0, 10.0 ]
+)
+
+sp3=parspace(
   'logM1', [ -1.5, 2.0 ],
   'logM2', [ -1.5, 2.0 ],
   'logP', [ -2.0, 3.0 ],
@@ -90,7 +140,9 @@ sp=parspace(
   #'log_rad1_resc', [ -0.25, 1.25 ],
   #'log_rad2_resc', [ -0.25, 1.25 ],
   'logTanom', [ -0.5, 0.5 ],
-  'log_blendFlux', [ -6.0, 2.0 ])
+  'blend_frac', [ 0.0, 1.0 ],
+  'flux_tune', [ 0.99, 1.01 ]
+)
   
 
 def likelihood(times,fluxes,errs,pars):
