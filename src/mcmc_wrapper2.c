@@ -12,16 +12,11 @@
 #include<unistd.h>
 #include "likelihood3.c"
 
-#define NPARAMS 10
 #define NCHAINS 50
 #define NPAST   500
-#define GAMMA (2.388/sqrt(2.*NPARAMS))
+#define GAMMA (2.388/sqrt(2.*NPARS))
 #define NUM_ELEMENTS(x) (size_of(x)/size_of(x[0]))
 
-typedef struct {
-  double lo;
-  double hi;
-} bounds;
 
 /*Change SIGMAP if necessary*/
 double SIGMAP;
@@ -44,61 +39,7 @@ void differential_evolution_proposal(double *x, long *seed, double **history, do
 // Adds John's version
 // Fold on lc
 // Profiler
-/* Set priors on parameters, and whether or not each parameter is bounded*/
-/* Siddhant: Maybe just use an if condition/switch statment instead of limited*/
-void set_limits(bounds limited[], bounds limits[])
-{
-  //limits on M1, in log10 MSUN
-  limited[0].lo = 1; 
-  limits[0].lo = -1.5;
-  limited[0].hi = 1;
-  limits[0].hi = 2.0;
-  //limits on M2, in log10 MSUN
-  limited[1].lo = 1;
-  limits[1].lo = -1.5;
-  limited[1].hi = 1;
-  limits[1].hi = 2.0;
-  //limits on P, in log10 days
-  limited[2].lo = 1;
-  limits[2].lo = -2.0;
-  limited[2].hi = 1;
-  limits[2].hi = 3.0;
-  //limits on e
-  limited[3].lo = 1;
-  limits[3].lo = 0.0;
-  limited[3].hi = 1;
-  limits[3].hi = 1.;
-  //limits on inc, in rads
-  limited[4].lo = 2;
-  limits[4].lo = -PI/2;
-  limited[4].hi = 2;
-  limits[4].hi = PI/2;
-  //limits on Omega, in rads
-  limited[5].lo = 2;
-  limits[5].lo = -PI;
-  limited[5].hi = 2;
-  limits[5].hi = PI;
-  //limits on omega0, in rads
-  limited[6].lo = 2;
-  limits[6].lo = -PI;
-  limited[6].hi = 2;
-  limits[6].hi = PI;
-  //limits on T0, in MDJ-2450000
-  limited[7].lo = 1;
-  limits[7].lo = -1000;
-  limited[7].hi = 1;
-  limits[7].hi = 1000.;
-  //limits on log rr1, the scale factor for R1
-  limited[8].lo = 1;
-  limits[8].lo = 0;
-  limited[8].hi = 1.;
-  limits[8].hi = 1.0;
-  //limits on log rr2, the scale factor for R2
-  limited[9].lo = 1;
-  limits[9].lo = 0.;
-  limited[9].hi = 1.;
-  limits[9].hi = 1.;
-}
+
 
 /* Siddhant: Functions to free memory from arrays */
 void free_1d(double *arr){
@@ -137,12 +78,12 @@ int main(int
   /* Siddhant: Adding small variable descriptions */
   long Niter;                     // Chain iterations
   double **P_;                    // Contains parameters - check why different from x - seems uneccessary
-  double P_0[NPARAMS];            
+  double P_0[NPARS];            
   double *y;                      // Updated Parameter
   double **x;                     // Parameter chains
   double ***history;              // Chain history
-  double xmap[NPARAMS];           // Contains the chain with best paramters
-  double dx[NPARAMS];             // Parameter step
+  double xmap[NPARS];           // Contains the chain with best paramters
+  double dx[NPARS];             // Parameter step
   double dx_mag;                  
   double alpha;                   // Random number stuff
   double logLx[NCHAINS];          // Log likelihood for all chains
@@ -168,7 +109,7 @@ int main(int
   double ls_period;  
   double SIGMAP;        
 
-  bounds limited[NPARAMS], limits[NPARAMS];
+  bounds limited[NPARS], limits[NPARS];
   FILE *param_file, *data_file, *chain_file, *logL_file;
   /* Siddhant: Initializing empty arrays help avoid memory leaks*/
   char  pfname[80]="", dfname[80]="",  parname[80]="",
@@ -218,20 +159,20 @@ int main(int
 
 
   P_ = (double **)malloc(NCHAINS*sizeof(double));
-  for(i=0;i<NCHAINS;i++) P_[i]=(double *)malloc(NPARAMS*sizeof(double));
+  for(i=0;i<NCHAINS;i++) P_[i]=(double *)malloc(NPARS*sizeof(double));
   
   x = (double **)malloc(NCHAINS*sizeof(double));
-  for(i=0;i<NCHAINS;i++) x[i]=(double *)malloc(NPARAMS*sizeof(double));
+  for(i=0;i<NCHAINS;i++) x[i]=(double *)malloc(NPARS*sizeof(double));
   
   history = (double ***)malloc(NCHAINS*sizeof(double));
   for(i=0;i<NCHAINS;i++) {
     history[i]=(double **)malloc(NPAST*sizeof(double));
-    for(j=0;j<NPAST;j++)history[i][j]=(double *)malloc(NPARAMS*sizeof(double));
+    for(j=0;j<NPAST;j++)history[i][j]=(double *)malloc(NPARS*sizeof(double));
   }
 
-  y = (double *)malloc(NPARAMS*sizeof(double));
-  sigma = (double *)malloc(NPARAMS*sizeof(double));
-  scale  = 1.0/((double)(NPARAMS));
+  y = (double *)malloc(NPARS*sizeof(double));
+  sigma = (double *)malloc(NPARS*sizeof(double));
+  scale  = 1.0/((double)(NPARS));
   //
 
   //true_err = 1.0;
@@ -248,7 +189,7 @@ int main(int
   
   int param_file_flag = 0;
   /* Siddhant: Initializing the chain parameters*/
-  for (i=0;i<NPARAMS;i++) {
+  for (i=0;i<NPARS;i++) {
     if (exists(parname)){
       fscanf(param_file,"%lf\n", &tmp); 
       printf("Par %d value: %.5e \n",i, tmp);
@@ -427,14 +368,14 @@ int main(int
 	      if(index[j]==0)DEtrial++;
 	      differential_evolution_proposal(x[index[j]], &seed, history[j], y);
 	      dx_mag=0;
-	        for (i=0;i<NPARAMS;i++) {
+	        for (i=0;i<NPARS;i++) {
 	          dx_mag+=(x[index[j]][i]-y[i])*(x[index[j]][i]-y[i]);
 	        }
 	      if (dx_mag < 1e-6)
 	        gaussian_proposal(x[index[j]], &seed, sigma, jscale, temp[j], y);
       }
 
-      for (i=0;i<NPARAMS;i++) {
+      for (i=0;i<NPARS;i++) {
 	      //enforce priors (reflecting boundary conditions)
 	      if ((limited[i].lo == 1)&&(y[i] < limits[i].lo))
 	        y[i] = 2.0*limits[i].lo - y[i];
@@ -460,7 +401,7 @@ int main(int
       //conditional acceptance of y
       if (alpha <= H) {
 	      if(index[j]==0) acc++;
-	      for (i=0;i<NPARAMS;i++) {
+	      for (i=0;i<NPARS;i++) {
 	        x[index[j]][i]=y[i];
 	      }
         logLx[index[j]] = logLy;
@@ -472,7 +413,7 @@ int main(int
 
       /*  fill history  */
       k = iter - (iter/NPAST)*NPAST;
-      for(i=0; i<NPARAMS; i++) history[j][k][i] = x[index[j]][i];
+      for(i=0; i<NPARS; i++) history[j][k][i] = x[index[j]][i];
     }
     /********Chain Loop ends**********/
     // Call timer after 10 iterations
@@ -484,7 +425,7 @@ int main(int
 
     //update map parameters
     if (logLx[index[0]] > logLmap) {
-      for (i=0;i<NPARAMS;i++) {
+      for (i=0;i<NPARS;i++) {
 	      xmap[i]=x[index[0]][i];
       }
       logLmap = logLx[index[0]];
@@ -494,7 +435,7 @@ int main(int
     if(iter%10==0) {
       //print parameter chains
       fprintf(chain_file,"%ld %.12g ",iter/10,logLx[index[0]]);
-      for(i=0; i<NPARAMS; i++) fprintf(chain_file,"%.12g ",x[index[0]][i]);
+      for(i=0; i<NPARS; i++) fprintf(chain_file,"%.12g ",x[index[0]][i]);
       fprintf(chain_file,"\n");
       
       //print log likelihood chains
@@ -527,6 +468,10 @@ int main(int
 	    x[index[0]][0],x[index[0]][1],x[index[0]][2],x[index[0]][3],x[index[0]][4]);
       fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
 	    x[index[0]][5],x[index[0]][6],x[index[0]][7],x[index[0]][8],x[index[0]][9],x[index[0]][10]);
+      if (ALPHA_FREE == 1){
+         fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e\n",
+	       x[index[0]][11],x[index[0]][12],x[index[0]][13],x[index[0]][14],x[index[0]][15]);
+      }
       fclose(param_file);
     }
     
@@ -545,6 +490,10 @@ int main(int
 	x[index[0]][0],x[index[0]][1],x[index[0]][2],x[index[0]][3],x[index[0]][4]);
   fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
 	x[index[0]][5],x[index[0]][6],x[index[0]][7],x[index[0]][8],x[index[0]][9],x[index[0]][10]);
+  if (ALPHA_FREE == 1){
+    fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e\n",
+	  x[index[0]][11],x[index[0]][12],x[index[0]][13],x[index[0]][14],x[index[0]][15]);
+  }
   fclose(param_file);
 
   // Free the memory from arrays
@@ -689,13 +638,13 @@ double gasdev2(long *idum)
 void uniform_proposal(double *x, long *seed, bounds limits[], double *y)
 {
 	int n;
-	double dx[NPARAMS];
+	double dx[NPARS];
 	
 	//compute size of jumps
-	for(n=0; n<NPARAMS; n++) dx[n] = ran2(seed)*(limits[n].hi - limits[n].lo);
+	for(n=0; n<NPARS; n++) dx[n] = ran2(seed)*(limits[n].hi - limits[n].lo);
 	
 	//uniform draw on prior range
-	for(n=0; n<NPARAMS; n++) y[n] = limits[n].lo + dx[n];
+	for(n=0; n<NPARS; n++) y[n] = limits[n].lo + dx[n];
 }
 
 void gaussian_proposal(double *x, long *seed, double *sigma, double scale, double temp, double *y)
@@ -703,16 +652,16 @@ void gaussian_proposal(double *x, long *seed, double *sigma, double scale, doubl
 	int n;
 	double gamma;
 	double sqtemp;
-	double dx[NPARAMS];
+	double dx[NPARS];
 	
 	//scale jumps by temperature
 	sqtemp = sqrt(temp);
 	
 	//compute size of jumps
-	for(n=0; n<NPARAMS; n++) dx[n] = gasdev2(seed)*sigma[n]*sqtemp*scale;
+	for(n=0; n<NPARS; n++) dx[n] = gasdev2(seed)*sigma[n]*sqtemp*scale;
 	
 	//jump in parameter directions scaled by dx
-	for(n=0; n<NPARAMS; n++) {
+	for(n=0; n<NPARS; n++) {
 	  y[n] = x[n] + dx[n];
     
 	  //printf("%12.5e %12.5e %12.5e %12.5e %12.5e\n",
@@ -729,7 +678,7 @@ void differential_evolution_proposal(double *x, long *seed, double **history, do
 	int n;
 	int a;
 	int b;
-	double dx[NPARAMS];
+	double dx[NPARS];
 	
 	//choose two samples from chain history
 	a = ran2(seed)*NPAST;
@@ -737,23 +686,23 @@ void differential_evolution_proposal(double *x, long *seed, double **history, do
 	while(b==a) b = ran2(seed)*NPAST;
 	
 	//compute vector connecting two samples
-	for(n=0; n<NPARAMS; n++) {
+	for(n=0; n<NPARS; n++) {
 	  dx[n] = history[b][n] - history[a][n];
 	}
 	//Blocks?
 	
 	//90% of jumps use Gaussian distribution for jump size
-	if(ran2(seed) < 0.9) for(n=0; n<NPARAMS; n++) dx[n] *= gasdev2(seed)*GAMMA;
+	if(ran2(seed) < 0.9) for(n=0; n<NPARS; n++) dx[n] *= gasdev2(seed)*GAMMA;
 
 	//jump along vector w/ appropriate scaling
-	for(n=0; n<NPARAMS; n++) y[n] = x[n] + dx[n];
+	for(n=0; n<NPARS; n++) y[n] = x[n] + dx[n];
 }
 
 void initialize_proposals(double *sigma, double ***history)
 {
 	int n,i,j;
 	double junk;
-	double x[NPARAMS];
+	double x[NPARS];
 	FILE *hfile;
 	
 	
@@ -773,9 +722,9 @@ void initialize_proposals(double *sigma, double ***history)
 	sigma[8]  = 1.0e-1;  //log flux normalization
 	sigma[9]  = 1.0e-2;  //log rr1 normalization
 	sigma[10]  = 1.0e-2;  //log rr2 normalization
-	//if (burn_in == 0) for(i=0; i<NPARAMS; i++) sigma[i] /= 100;
+	//if (burn_in == 0) for(i=0; i<NPARS; i++) sigma[i] /= 100;
 	
-	//for(i=0; i<NPARAMS; i++) sigma[i] /= ((double)(NPARAMS));
+	//for(i=0; i<NPARS; i++) sigma[i] /= ((double)(NPARS));
 		
 	
 	/**********************/    
@@ -795,10 +744,10 @@ void initialize_proposals(double *sigma, double ***history)
 	{
 		//read in parameter from history file
 		fscanf(hfile,"%i %lg",&n,&junk);
-		for(n=0; n<NPARAMS; n++)fscanf(hfile,"%lg",&x[n]);
+		for(n=0; n<NPARS; n++)fscanf(hfile,"%lg",&x[n]);
 		
 		//copy parameters across all chains
-		for(j=0; j<NCHAINS; j++) for(n=0; j<NPARAMS; n++) history[j][i][n] = x[n];
+		for(j=0; j<NCHAINS; j++) for(n=0; j<NPARS; n++) history[j][i][n] = x[n];
 	}
 	
 	fclose(hfile);
