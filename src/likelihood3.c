@@ -29,7 +29,12 @@ rr2:            Radius scaling factor for star 2
 #define MSUN 1.9885e33
 #define RSUN 6.955e10
 #define SEC_DAY 86400.0
-#define NPARS 11
+#define ALPHA_FREE 1 // to set coefficitents as parameters in the model
+#if ALPHA_FREE == 1
+    #define NPARS 16
+#else
+    #define NPARS 10
+#endif
 
 #define SQR(x) ((x)*(x))
 #define CUBE(x) ((x)*(x)*(x))
@@ -425,11 +430,34 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     double T0 = pars[7]*SEC_DAY;
     double rr1 = pow(10., pars[8]);
     double rr2 = pow(10., pars[9]);
-
+    
+    // Beaming coefficients
+    int compute_alpha_beam = 0;
+    double alpha_beam_1 = 1.;
+    double alpha_beam_2 = 1.;
+    double mu_1, mu_2, tau_1, tau_2, alpha_ref_1, alpha_ref_2;
+    
+    if (ALPHA_FREE == 1){
+        // Limb and gravity darkening coefficients respectively
+        mu_1 = pars[10];
+        tau_1 = pars[11];
+        mu_2 = pars[12];
+        tau_2 = pars[13];
+        // Reflection coefficients
+        alpha_ref_1 = pars[14];
+        alpha_ref_2 = pars[15];
+    }
+    else{
+        mu_1 = .16;
+        tau_1 = .344;
+        mu_2 = .16;
+        tau_2 = .344;
+        alpha_ref_1 = .1;
+        alpha_ref_2 = .1;
+    }
+    
     double M1 = pow(10., logM1);
     double M2 = pow(10., logM2);
-
-    int compute_alpha_beam = 0;
 
     // Compute effective temperature and radius
     double Tcoeff[] = {3.74677,0.557556,0.184408,-0.0640800,-0.0359547};
@@ -453,6 +481,12 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     double Norm1, Norm2;
     Norm1 = SQR(R1) * QUAD(Teff1) / (SQR(R1) * QUAD(Teff1) + SQR(R2) * QUAD(Teff2));
     Norm2 = SQR(R2) * QUAD(Teff2) / (SQR(R1) * QUAD(Teff1) + SQR(R2) * QUAD(Teff2));
+
+    // Set alpha_beam
+    if (compute_alpha_beam == 1) {
+        alpha_beam_1 = get_alpha_beam(log10(Teff1 * 5580));
+        alpha_beam_2 = get_alpha_beam(log10(Teff2 * 5580));
+    }
 
     // Semi majot axis (cgs calculation)
     double Mtot = (M1+M2)*MSUN;
@@ -501,27 +535,15 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
         Amag1[i] = 0.;
         Amag2[i] = 0.;
 
-        // Beaming and reflection coefficients
-        double alpha_beam_1 = 1.;
-        double alpha_beam_2 = 1.;
-        double alpha_ref = .1;
-        double mu = .16;
-        double tau = .344;
-
-        if (compute_alpha_beam == 1) {
-            alpha_beam_1 = get_alpha_beam(log10(Teff1 * 5580));
-            alpha_beam_2 = get_alpha_beam(log10(Teff2 * 5580));
-            }
-
         double beam1 = beaming(Pdays, M1, M2, e, inc, omega0, nu_arr[i], alpha_beam_1);
-        double ellip1 = ellipsoidal(Pdays, M1, M2, e, inc, omega0, nu_arr[i], R1, ar, mu, tau);
-        double ref1 = reflection(Pdays, M1, M2, e, inc, omega0, nu_arr[i], R2, alpha_ref);
+        double ellip1 = ellipsoidal(Pdays, M1, M2, e, inc, omega0, nu_arr[i], R1, ar, mu_1, tau_1);
+        double ref1 = reflection(Pdays, M1, M2, e, inc, omega0, nu_arr[i], R2, alpha_ref_1);
 
         Amag1[i] = Norm1 * (1 + beam1 + ellip1 + ref1);
 
         double beam2 = beaming(Pdays, M2, M1, e, inc, (omega0+PI), nu_arr[i], alpha_beam_2);
-        double ellip2 = ellipsoidal(Pdays, M2, M1, e, inc, (omega0+PI), nu_arr[i], R2, ar, mu, tau);
-        double ref2 = reflection(Pdays, M2, M1, e, inc, (omega0+PI), nu_arr[i], R1, alpha_ref);
+        double ellip2 = ellipsoidal(Pdays, M2, M1, e, inc, (omega0+PI), nu_arr[i], R2, ar, mu_2, tau_2);
+        double ref2 = reflection(Pdays, M2, M1, e, inc, (omega0+PI), nu_arr[i], R1, alpha_ref_2);
 
         Amag2[i] = Norm2 * (1 + beam2 + ellip2 + ref2);
 
@@ -593,4 +615,98 @@ double loglikelihood(double time[], double data[], double noise[],
   
   //return log likelihood
   return(-chi2/2.0);
+}
+
+typedef struct {
+  double lo;
+  double hi;
+} bounds;
+
+/* Set priors on parameters, and whether or not each parameter is bounded*/
+/* Siddhant: Maybe just use an if condition/switch statment instead of limited*/
+void set_limits(bounds limited[], bounds limits[])
+{
+  //limits on M1, in log10 MSUN
+  limited[0].lo = 1; 
+  limits[0].lo = -1.5;
+  limited[0].hi = 1;
+  limits[0].hi = 2.0;
+  //limits on M2, in log10 MSUN
+  limited[1].lo = 1;
+  limits[1].lo = -1.5;
+  limited[1].hi = 1;
+  limits[1].hi = 2.0;
+  //limits on P, in log10 days
+  limited[2].lo = 1;
+  limits[2].lo = -2.0;
+  limited[2].hi = 1;
+  limits[2].hi = 3.0;
+  //limits on e
+  limited[3].lo = 1;
+  limits[3].lo = 0.0;
+  limited[3].hi = 1;
+  limits[3].hi = 1.;
+  //limits on inc, in rads
+  limited[4].lo = 2;
+  limits[4].lo = -PI/2;
+  limited[4].hi = 2;
+  limits[4].hi = PI/2;
+  //limits on Omega, in rads
+  limited[5].lo = 2;
+  limits[5].lo = -PI;
+  limited[5].hi = 2;
+  limits[5].hi = PI;
+  //limits on omega0, in rads
+  limited[6].lo = 2;
+  limits[6].lo = -PI;
+  limited[6].hi = 2;
+  limits[6].hi = PI;
+  //limits on T0, in MDJ-2450000
+  limited[7].lo = 1;
+  limits[7].lo = -1000;
+  limited[7].hi = 1;
+  limits[7].hi = 1000.;
+  //limits on log rr1, the scale factor for R1
+  limited[8].lo = 1;
+  limits[8].lo = 0;
+  limited[8].hi = 1.;
+  limits[8].hi = 1.0;
+  //limits on log rr2, the scale factor for R2
+  limited[9].lo = 1;
+  limits[9].lo = 0.;
+  limited[9].hi = 1.;
+  limits[9].hi = 1.;
+  if (ALPHA_FREE == 1){
+    // Limits of the alpha_coefficients
+    // limits on limb darkening coefficient for star 1
+    limited[10].lo = 1;
+    limits[10].lo = 0.;
+    limited[10].hi = 1.;
+    limits[10].hi = 1.;
+    // limits on gravity darkening coefficient for star 1
+    limited[11].lo = 1;
+    limits[11].lo = 0.;
+    limited[11].hi = 1.;
+    limits[11].hi = 1.;
+    // limits on limb darkening coefficient for star 2
+    limited[12].lo = 1;
+    limits[12].lo = 0.;
+    limited[12].hi = 1.;
+    limits[12].hi = 1.;
+    // limits on gravity darkening coefficient for star 2
+    limited[13].lo = 1;
+    limits[13].lo = 0.;
+    limited[13].hi = 1.;
+    limits[13].hi = 1.;
+    // limits on reflection coefficients on star 1
+    limited[14].lo = 1;
+    limits[14].lo = 0.;
+    limited[14].hi = 1.;
+    limits[14].hi = 1.;
+    // limits on reflection coefficients on star 2
+    limited[15].lo = 1;
+    limits[15].lo = 0.;
+    limited[15].hi = 1.;
+    limits[15].hi = 1.;
+  }
 }
