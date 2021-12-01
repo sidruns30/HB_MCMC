@@ -1,5 +1,5 @@
 /*********************************************************/
-//similar to mcmc_wrapper.c, but uses likelihood2.c,
+//similar to mcmc_wrapper.c, but uses likelihood3.c,
 //with independently varying R1,R2
 //instead of using main sequence scaling relations
 /*********************************************************/
@@ -10,19 +10,16 @@
 #include <time.h>
 #include <omp.h>
 #include<unistd.h>
-#include "likelihood2.c"
+#include "likelihood3.c"
 
-#define NPARAMS 11
 #define NCHAINS 50
 #define NPAST   500
-#define SIGMAP 1.0e-1
-#define GAMMA (2.388/sqrt(2.*NPARAMS))
+#define GAMMA (2.388/sqrt(2.*NPARS))
 #define NUM_ELEMENTS(x) (size_of(x)/size_of(x[0]))
 
-typedef struct {
-  double lo;
-  double hi;
-} bounds;
+
+/*Change SIGMAP if necessary*/
+double SIGMAP;
 
 /* From likelihood.c */
 void calc_light_curve(double t_data[], long Nt, double P_[], double light_curve[]);
@@ -42,66 +39,7 @@ void differential_evolution_proposal(double *x, long *seed, double **history, do
 // Adds John's version
 // Fold on lc
 // Profiler
-/* Set priors on parameters, and whether or not each parameter is bounded*/
-/* Siddhant: Maybe just use an if condition/switch statment instead of limited*/
-void set_limits(bounds limited[], bounds limits[])
-{
-  //limits on M1, in log10 MSUN
-  limited[0].lo = 1; 
-  limits[0].lo = -1.5;
-  limited[0].hi = 1;
-  limits[0].hi = 2.0;
-  //limits on M2, in log10 MSUN
-  limited[1].lo = 1;
-  limits[1].lo = -1.5;
-  limited[1].hi = 1;
-  limits[1].hi = 2.0;
-  //limits on P, in log10 days
-  limited[2].lo = 1;
-  limits[2].lo = -2.0;
-  limited[2].hi = 1;
-  limits[2].hi = 3.0;
-  //limits on e
-  limited[3].lo = 1;
-  limits[3].lo = 0.0;
-  limited[3].hi = 1;
-  limits[3].hi = 1.;
-  //limits on inc, in degrees
-  limited[4].lo = 2;
-  limits[4].lo = -90.;
-  limited[4].hi = 2;
-  limits[4].hi = 90.;
-  //limits on Omega, in degrees
-  limited[5].lo = 2;
-  limits[5].lo = -180.;
-  limited[5].hi = 2;
-  limits[5].hi = 180.;
-  //limits on omega0, in degrees
-  limited[6].lo = 2;
-  limits[6].lo = -180;
-  limited[6].hi = 2;
-  limits[6].hi = 180.;
-  //limits on T0, in MDJ-2450000
-  limited[7].lo = 1;
-  limits[7].lo = -1000;
-  limited[7].hi = 1;
-  limits[7].hi = 1000.;
-  //limits on log Flux0, in TESS counts
-  limited[8].lo = 1;
-  limits[8].lo = -5.0;
-  limited[8].hi = 1.;
-  limits[8].hi = 5.0;
-  //limits on log rr1, the scale factor for R1
-  limited[9].lo = 1;
-  limits[9].lo = -2.0;
-  limited[9].hi = 1.;
-  limits[9].hi = 2.0;
-  //limits on log rr2, the scale factor for R2
-  limited[10].lo = 1;
-  limits[10].lo = -2.0;
-  limited[10].hi = 1.;
-  limits[10].hi = 2.0;
-}
+
 
 /* Siddhant: Functions to free memory from arrays */
 void free_1d(double *arr){
@@ -140,12 +78,12 @@ int main(int
   /* Siddhant: Adding small variable descriptions */
   long Niter;                     // Chain iterations
   double **P_;                    // Contains parameters - check why different from x - seems uneccessary
-  double P_0[NPARAMS];            
+  double P_0[NPARS];            
   double *y;                      // Updated Parameter
   double **x;                     // Parameter chains
   double ***history;              // Chain history
-  double xmap[NPARAMS];           // Contains the chain with best paramters
-  double dx[NPARAMS];             // Parameter step
+  double xmap[NPARS];           // Contains the chain with best paramters
+  double dx[NPARS];             // Parameter step
   double dx_mag;                  
   double alpha;                   // Random number stuff
   double logLx[NCHAINS];          // Log likelihood for all chains
@@ -167,9 +105,11 @@ int main(int
   long Nt,Nstart,Nstop,subN,obs_id,nch;
   long acc;                       
   long iter,TICid;                
-  int *index, burn_in;            
+  int *index, burn_in;
+  double ls_period;  
+  double SIGMAP;        
 
-  bounds limited[NPARAMS], limits[NPARAMS];
+  bounds limited[NPARS], limits[NPARS];
   FILE *param_file, *data_file, *chain_file, *logL_file;
   /* Siddhant: Initializing empty arrays help avoid memory leaks*/
   char  pfname[80]="", dfname[80]="",  parname[80]="",
@@ -177,48 +117,62 @@ int main(int
         logLname[80]="", RUN_ID[11]="";
   //characteristic magnitude of MCMC step in each parameter
   double  *sigma;
-  
+
   Niter = (long)atoi(argv[1]);
   strcpy(RUN_ID,argv[2]);
   true_err = (double)atof(argv[3]);
   burn_in = atoi(argv[4]);
+  ls_period = (double)atof(argv[5]);
 
-  strcat(subparname,"../subpars/subpar.");
+  // Set period search
+  if (burn_in == 2) {SIGMAP = 1.e-10;}
+  else              {SIGMAP = 1.e-1;}
+
+  strcat(subparname,"../data/subpars/subpar.");
   strcat(subparname,RUN_ID);
   strcat(subparname,".dat");
-  strcat(parname,"../pars/par.");
+  strcat(parname,"../data/pars/par.");
   strcat(parname,RUN_ID);
   strcat(parname,".dat");
-  strcat(chainname,"../chains/chain.");
+  strcat(chainname,"../data/chains/chain.");
   strcat(chainname,RUN_ID);
   strcat(chainname,".dat");
-  strcat(logLname,"../logL/logL.");
+  strcat(logLname,"../data/logL/logL.");
   strcat(logLname,RUN_ID);
   strcat(logLname,".dat");
-  strcat(outname,"../lightcurves/mcmc_lightcurves/");
+  strcat(outname,"../data/lightcurves/mcmc_lightcurves/");
   strcat(outname,RUN_ID);
   strcat(outname,".out");
   printf("%s\n",parname);
-  strcpy(dfname,"../lightcurves/folded_lightcurves/");                // TESS data file
+
+  /*Use binned period if period is found, otherwise use the full lightcurve*/
+  if (burn_in == 2){
+  strcpy(dfname,"../data/lightcurves/folded_lightcurves/");
   strcat(dfname,RUN_ID);
-  //strcat(dfname,".txt");            // complete data set
-  //strcat(dfname,".bin");          // binned data
+  strcat(dfname,"_new.txt");
+  }
+  else {
+    strcpy(dfname,"../data/lightcurves/original/");
+    strcat(dfname,RUN_ID);
+    strcat(dfname,".txt");
+  }
+
 
   P_ = (double **)malloc(NCHAINS*sizeof(double));
-  for(i=0;i<NCHAINS;i++) P_[i]=(double *)malloc(NPARAMS*sizeof(double));
+  for(i=0;i<NCHAINS;i++) P_[i]=(double *)malloc(NPARS*sizeof(double));
   
   x = (double **)malloc(NCHAINS*sizeof(double));
-  for(i=0;i<NCHAINS;i++) x[i]=(double *)malloc(NPARAMS*sizeof(double));
+  for(i=0;i<NCHAINS;i++) x[i]=(double *)malloc(NPARS*sizeof(double));
   
   history = (double ***)malloc(NCHAINS*sizeof(double));
   for(i=0;i<NCHAINS;i++) {
     history[i]=(double **)malloc(NPAST*sizeof(double));
-    for(j=0;j<NPAST;j++)history[i][j]=(double *)malloc(NPARAMS*sizeof(double));
+    for(j=0;j<NPAST;j++)history[i][j]=(double *)malloc(NPARS*sizeof(double));
   }
 
-  y = (double *)malloc(NPARAMS*sizeof(double));
-  sigma = (double *)malloc(NPARAMS*sizeof(double));
-  scale  = 1.0/((double)(NPARAMS));
+  y = (double *)malloc(NPARS*sizeof(double));
+  sigma = (double *)malloc(NPARS*sizeof(double));
+  scale  = 1.0/((double)(NPARS));
   //
 
   //true_err = 1.0;
@@ -232,10 +186,21 @@ int main(int
   set_limits(limited,limits);
   //set up proposal distribution
   initialize_proposals(sigma, history);
+  
+  int param_file_flag = 0;
   /* Siddhant: Initializing the chain parameters*/
-  for (i=0;i<NPARAMS;i++) {
-    if (exists(parname)){fscanf(param_file,"%lf\n", &tmp);}
-    else tmp = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);  // Assign random parameters
+  for (i=0;i<NPARS;i++) {
+    if (exists(parname)){
+      fscanf(param_file,"%lf\n", &tmp); 
+      printf("Par %d value: %.5e \n",i, tmp);
+      param_file_flag = 1;
+      }
+  
+    else {
+      tmp = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
+      printf("\t assinging random pars \n");
+      }
+
     P_[0][i] = tmp;
     P_0[i]   = tmp;
     x[0][i]  = P_[0][i];
@@ -244,61 +209,113 @@ int main(int
       P_[j][i] = P_[0][i];
       x[j][i]  = P_[0][i];
     }
+
     if (burn_in == 1) {
       for(j=0; j<NCHAINS; j++) {
-	      P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
-	      x[j][i]  = P_[j][i];
+        if (param_file_flag != 1){
+          P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
+          x[j][i]  = P_[j][i];
+        }
+        
       }
     }
 
     if (burn_in == 2) {
       for(j=0; j<NCHAINS; j++) {
-	      P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
-	      if (i == 2) P_[j][i] = P_0[i];  // Keep the period
-	      x[j][i]  = P_[j][i];
+        if (param_file_flag != 1){
+          P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
+          if (i == 2) P_[j][i] = ls_period;  // Keep the period
+          if (i == 7) P_[j][i] = 0;          // Set T0 = 0
+          x[j][i]  = P_[j][i];
+        }
       }
     }
   }
-  if (exists(parname)){fclose(param_file);}
-  /* Read TESS data file */
-  data_file = fopen(dfname,"r");
-  tmp = 0;
-  fscanf(data_file,"%ld\n", &Nt);
-  Nt = 2*Nt;
-  subN         = 0;
-  rdata        = (double *)malloc(3*Nt*sizeof(double));
-  index        = (int *)malloc(NCHAINS*sizeof(int));
 
-  for (i=0;i<Nt;i++) {
-    fscanf(data_file,"%lf\t%lf\t%lf\n", &tmp1, &tmp2, &tmp3);
-    rdata[i*3]=tmp1;
-    rdata[i*3+1]=tmp2;
-    rdata[i*3+2]=tmp3;
-    subN++;
-    //rdata[i*4+3]=tmp4;
-    //if (tmp4 == 0) subN++;
-  }
-  printf("Closing data file \n");
-  fclose(data_file);
+  if (burn_in == 1){
+      printf("Test6 \n");
+      printf("Dfname:");
+      //printf("%s", dfname);
+    if (exists(parname)){fclose(param_file);}
+    /* Read binned data file */
+    printf("Opening data file %s", dfname);
+    data_file = fopen(dfname,"r");
+    tmp = 0;
+    fscanf(data_file,"%ld\n", &Nt);
+    subN         = 0;
+    rdata        = (double *)malloc(4*Nt*sizeof(double));
+    index        = (int *)malloc(NCHAINS*sizeof(int));
 
-  a_data       = (double *)malloc(subN*sizeof(double));
-  a_model      = (double *)malloc(subN*sizeof(double));
-  t_data       = (double *)malloc(subN*sizeof(double));
-  e_data       = (double *)malloc(subN*sizeof(double));
-  q_data       = (double *)malloc(subN*sizeof(double));
-  light_curve  = (double *)malloc(subN*sizeof(double));
-  light_curve2 = (double *)malloc(subN*sizeof(double));
-
-  subi = 0;
-  for (i=0;i<Nt;i++) {
-    // tmp4 = rdata[i*4+3];
-    //if (tmp4 == 0) {
-    t_data[subi] = rdata[i*3]; 
-    a_data[subi] = rdata[i*3+1]; 
-    e_data[subi] = rdata[i*3+2];// sqrt(rdata[i*4+1])*true_err;
-    subi++;
-    //}
+    printf("Test7 \n");
+    for (i=0;i<Nt;i++) {
+      fscanf(data_file,"%lf %lf %lf %lf\n", &tmp1, &tmp2, &tmp3, &tmp4);
+      rdata[i*4]=tmp1;
+      rdata[i*4+1]=tmp2;
+      rdata[i*4+2]=tmp3;
+      rdata[i*4+3]=tmp4;
+      if (tmp4 == 0) subN++;
+    }
+    printf("Closing data file \n");
+    fclose(data_file);
+    
+    a_data       = (double *)malloc(subN*sizeof(double));
+    a_model      = (double *)malloc(subN*sizeof(double));
+    t_data       = (double *)malloc(subN*sizeof(double));
+    e_data       = (double *)malloc(subN*sizeof(double));
+    q_data       = (double *)malloc(subN*sizeof(double));
+    light_curve  = (double *)malloc(subN*sizeof(double));
+    light_curve2 = (double *)malloc(subN*sizeof(double));
+    
+    subi = 0;
+    for (i=0;i<Nt;i++) {
+      tmp4 = rdata[i*4+3];
+      if (tmp4 == 0) {
+      t_data[subi] = rdata[i*4]; 
+      a_data[subi] = rdata[i*4+1]; 
+      e_data[subi] = sqrt(rdata[i*4+1])*true_err;
+      subi++;
+      }
   }      
+  }
+
+  else if (burn_in == 2){
+    if (exists(parname)){fclose(param_file);}
+    printf("Opening folded lc data file %s \n", dfname);
+    /* Read binned data file */
+    data_file = fopen(dfname,"r");
+    tmp = 0;
+    fscanf(data_file,"%ld\n", &Nt);
+    Nt = Nt;
+    subN         = 0;
+    rdata        = (double *)malloc(3*Nt*sizeof(double));
+    index        = (int *)malloc(NCHAINS*sizeof(int));
+
+    for (i=0;i<Nt;i++) {
+      fscanf(data_file,"%lf\t%lf\t%lf\n", &tmp1, &tmp2, &tmp3);
+      rdata[i*3]=tmp1;
+      rdata[i*3+1]=tmp2;
+      rdata[i*3+2]=tmp3;
+      subN++;
+    }
+    printf("Closing data file \n");
+    fclose(data_file);
+
+    a_data       = (double *)malloc(subN*sizeof(double));
+    a_model      = (double *)malloc(subN*sizeof(double));
+    t_data       = (double *)malloc(subN*sizeof(double));
+    e_data       = (double *)malloc(subN*sizeof(double));
+    q_data       = (double *)malloc(subN*sizeof(double));
+    light_curve  = (double *)malloc(subN*sizeof(double));
+    light_curve2 = (double *)malloc(subN*sizeof(double));
+    
+    for (subi=0;subi<Nt;subi++) {
+      t_data[subi] = rdata[subi*3]; 
+      a_data[subi] = rdata[subi*3+1]; 
+      e_data[subi] = rdata[subi*3+2];
+  }
+  }
+
+
 	
   // initialize parallel tempering
   /* Siddhant: what is dtemp and why is it set to an arbitrary value like this */
@@ -315,9 +332,10 @@ int main(int
 
   //initialize likelihood
   logLmap = loglikelihood(t_data,a_data,e_data,subN,P_[0]);
-  printf("initial chi2 %g\n",-2*logLmap);
 
-  for(i=0; i<NCHAINS; i++) logLx[i] = logLmap;
+  printf("initial chi2 %g\n",-2*logLmap);
+ 
+  //for(i=0; i<NCHAINS; i++) logLx[i] = logLmap;
 
   acc=0;
   printf("Creating chain and log files \n");
@@ -350,14 +368,14 @@ int main(int
 	      if(index[j]==0)DEtrial++;
 	      differential_evolution_proposal(x[index[j]], &seed, history[j], y);
 	      dx_mag=0;
-	        for (i=0;i<NPARAMS;i++) {
+	        for (i=0;i<NPARS;i++) {
 	          dx_mag+=(x[index[j]][i]-y[i])*(x[index[j]][i]-y[i]);
 	        }
 	      if (dx_mag < 1e-6)
 	        gaussian_proposal(x[index[j]], &seed, sigma, jscale, temp[j], y);
       }
 
-      for (i=0;i<NPARAMS;i++) {
+      for (i=0;i<NPARS;i++) {
 	      //enforce priors (reflecting boundary conditions)
 	      if ((limited[i].lo == 1)&&(y[i] < limits[i].lo))
 	        y[i] = 2.0*limits[i].lo - y[i];
@@ -383,7 +401,7 @@ int main(int
       //conditional acceptance of y
       if (alpha <= H) {
 	      if(index[j]==0) acc++;
-	      for (i=0;i<NPARAMS;i++) {
+	      for (i=0;i<NPARS;i++) {
 	        x[index[j]][i]=y[i];
 	      }
         logLx[index[j]] = logLy;
@@ -395,19 +413,19 @@ int main(int
 
       /*  fill history  */
       k = iter - (iter/NPAST)*NPAST;
-      for(i=0; i<NPARAMS; i++) history[j][k][i] = x[index[j]][i];
+      for(i=0; i<NPARS; i++) history[j][k][i] = x[index[j]][i];
     }
     /********Chain Loop ends**********/
     // Call timer after 10 iterations
-    if (iter%10 == 9){
-      end = clock();
-      double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-      printf("time spent in the last 10 iterations: %f \n", time_spent);
-      }
+    //if (iter%10 == 9){
+    //  end = clock();
+    //  double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    //  printf("time spent in the last 10 iterations: %f \n", time_spent);
+    //  }
 
     //update map parameters
     if (logLx[index[0]] > logLmap) {
-      for (i=0;i<NPARAMS;i++) {
+      for (i=0;i<NPARS;i++) {
 	      xmap[i]=x[index[0]][i];
       }
       logLmap = logLx[index[0]];
@@ -417,7 +435,7 @@ int main(int
     if(iter%10==0) {
       //print parameter chains
       fprintf(chain_file,"%ld %.12g ",iter/10,logLx[index[0]]);
-      for(i=0; i<NPARAMS; i++) fprintf(chain_file,"%.12g ",x[index[0]][i]);
+      for(i=0; i<NPARS; i++) fprintf(chain_file,"%.12g ",x[index[0]][i]);
       fprintf(chain_file,"\n");
       
       //print log likelihood chains
@@ -427,7 +445,7 @@ int main(int
     }
     
     //update progress to screen
-    if(iter%10==0) {
+    if(iter%100==0) {
 	    printf("%ld/%ld logL=%.10g acc=%.3g DEacc=%.3g",iter,Niter,logLx[index[0]],
 	    (double)(acc)/((double)atrial),
 	    (double)DEacc/(double)DEtrial);
@@ -450,6 +468,10 @@ int main(int
 	    x[index[0]][0],x[index[0]][1],x[index[0]][2],x[index[0]][3],x[index[0]][4]);
       fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
 	    x[index[0]][5],x[index[0]][6],x[index[0]][7],x[index[0]][8],x[index[0]][9],x[index[0]][10]);
+      if (ALPHA_FREE == 1){
+         fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e\n",
+	       x[index[0]][11],x[index[0]][12],x[index[0]][13],x[index[0]][14],x[index[0]][15]);
+      }
       fclose(param_file);
     }
     
@@ -468,6 +490,10 @@ int main(int
 	x[index[0]][0],x[index[0]][1],x[index[0]][2],x[index[0]][3],x[index[0]][4]);
   fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
 	x[index[0]][5],x[index[0]][6],x[index[0]][7],x[index[0]][8],x[index[0]][9],x[index[0]][10]);
+  if (ALPHA_FREE == 1){
+    fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e\n",
+	  x[index[0]][11],x[index[0]][12],x[index[0]][13],x[index[0]][14],x[index[0]][15]);
+  }
   fclose(param_file);
 
   // Free the memory from arrays
@@ -612,13 +638,13 @@ double gasdev2(long *idum)
 void uniform_proposal(double *x, long *seed, bounds limits[], double *y)
 {
 	int n;
-	double dx[NPARAMS];
+	double dx[NPARS];
 	
 	//compute size of jumps
-	for(n=0; n<NPARAMS; n++) dx[n] = ran2(seed)*(limits[n].hi - limits[n].lo);
+	for(n=0; n<NPARS; n++) dx[n] = ran2(seed)*(limits[n].hi - limits[n].lo);
 	
 	//uniform draw on prior range
-	for(n=0; n<NPARAMS; n++) y[n] = limits[n].lo + dx[n];
+	for(n=0; n<NPARS; n++) y[n] = limits[n].lo + dx[n];
 }
 
 void gaussian_proposal(double *x, long *seed, double *sigma, double scale, double temp, double *y)
@@ -626,16 +652,16 @@ void gaussian_proposal(double *x, long *seed, double *sigma, double scale, doubl
 	int n;
 	double gamma;
 	double sqtemp;
-	double dx[NPARAMS];
+	double dx[NPARS];
 	
 	//scale jumps by temperature
 	sqtemp = sqrt(temp);
 	
 	//compute size of jumps
-	for(n=0; n<NPARAMS; n++) dx[n] = gasdev2(seed)*sigma[n]*sqtemp*scale;
+	for(n=0; n<NPARS; n++) dx[n] = gasdev2(seed)*sigma[n]*sqtemp*scale;
 	
 	//jump in parameter directions scaled by dx
-	for(n=0; n<NPARAMS; n++) {
+	for(n=0; n<NPARS; n++) {
 	  y[n] = x[n] + dx[n];
     
 	  //printf("%12.5e %12.5e %12.5e %12.5e %12.5e\n",
@@ -652,7 +678,7 @@ void differential_evolution_proposal(double *x, long *seed, double **history, do
 	int n;
 	int a;
 	int b;
-	double dx[NPARAMS];
+	double dx[NPARS];
 	
 	//choose two samples from chain history
 	a = ran2(seed)*NPAST;
@@ -660,23 +686,23 @@ void differential_evolution_proposal(double *x, long *seed, double **history, do
 	while(b==a) b = ran2(seed)*NPAST;
 	
 	//compute vector connecting two samples
-	for(n=0; n<NPARAMS; n++) {
+	for(n=0; n<NPARS; n++) {
 	  dx[n] = history[b][n] - history[a][n];
 	}
 	//Blocks?
 	
 	//90% of jumps use Gaussian distribution for jump size
-	if(ran2(seed) < 0.9) for(n=0; n<NPARAMS; n++) dx[n] *= gasdev2(seed)*GAMMA;
+	if(ran2(seed) < 0.9) for(n=0; n<NPARS; n++) dx[n] *= gasdev2(seed)*GAMMA;
 
 	//jump along vector w/ appropriate scaling
-	for(n=0; n<NPARAMS; n++) y[n] = x[n] + dx[n];
+	for(n=0; n<NPARS; n++) y[n] = x[n] + dx[n];
 }
 
 void initialize_proposals(double *sigma, double ***history)
 {
 	int n,i,j;
 	double junk;
-	double x[NPARAMS];
+	double x[NPARS];
 	FILE *hfile;
 	
 	
@@ -696,9 +722,9 @@ void initialize_proposals(double *sigma, double ***history)
 	sigma[8]  = 1.0e-1;  //log flux normalization
 	sigma[9]  = 1.0e-2;  //log rr1 normalization
 	sigma[10]  = 1.0e-2;  //log rr2 normalization
-	//if (burn_in == 0) for(i=0; i<NPARAMS; i++) sigma[i] /= 100;
+	//if (burn_in == 0) for(i=0; i<NPARS; i++) sigma[i] /= 100;
 	
-	//for(i=0; i<NPARAMS; i++) sigma[i] /= ((double)(NPARAMS));
+	//for(i=0; i<NPARS; i++) sigma[i] /= ((double)(NPARS));
 		
 	
 	/**********************/    
@@ -718,10 +744,10 @@ void initialize_proposals(double *sigma, double ***history)
 	{
 		//read in parameter from history file
 		fscanf(hfile,"%i %lg",&n,&junk);
-		for(n=0; n<NPARAMS; n++)fscanf(hfile,"%lg",&x[n]);
+		for(n=0; n<NPARS; n++)fscanf(hfile,"%lg",&x[n]);
 		
 		//copy parameters across all chains
-		for(j=0; j<NCHAINS; j++) for(n=0; j<NPARAMS; n++) history[j][i][n] = x[n];
+		for(j=0; j<NCHAINS; j++) for(n=0; j<NPARS; n++) history[j][i][n] = x[n];
 	}
 	
 	fclose(hfile);
