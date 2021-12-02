@@ -389,7 +389,7 @@ double eclipse_area(double R1, double R2,
         h = sqrt(h_sq);
         double Arh1 = R1*R1*asin(h/R1)-h*sqrt(R1*R1-h*h);
         double Arh2 = R2*R2*asin(h/R2)-h*sqrt(R2*R2-h*h);
-        area = PI*R2*R2-(Arh1 + Arh2);
+        area = PI*R2*R2-(-Arh1 + Arh2);
         }
 
     return area;

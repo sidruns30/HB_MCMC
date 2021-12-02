@@ -19,7 +19,7 @@
 #define QUAD(x) ((x)*(x)*(x)*(x))
 #define NPARS 11
 
-static inline void swap(double *x, double *y){
+static inline void swap2(double *x, double *y){
   double temp = *x;
   *x = *y;
   *y = temp;
@@ -34,24 +34,24 @@ double A_rh(double R, double h)
 double overlap(double r1, double r2, double d)
 {
   double h,r,dc,area,h_sq;
-  if (r2 > r1) swap(&r1, &r2);
+  if (r2 > r1) swap2(&r1, &r2);
   d = fabs(d);
   if (d >= (r1+r2)) area = 0.;
   else if (d < (r1-r2)) area = PI*r2*r2;
   dc = sqrt(r1*r1-r2*r2);
   if ((d > dc)&(d < (r1+r2))) { 
     h_sq = (4.*d*d*r1*r1- SQR(d*d-r2*r2+r1*r1))/(4.*d*d);
-    h = sqrt(h);
+    h = sqrt(h_sq);
     area = A_rh(r1,h)+A_rh(r2,h);}
   if ((d <= dc)&(d >= (r1-r2))) { 
     h_sq = (4.*d*d*r1*r1- SQR(d*d-r2*r2+r1*r1))/(4.*d*d);
-    h = sqrt(h);
+    h = sqrt(h_sq);
     area = PI*r2*r2-(A_rh(r2,h)-A_rh(r1,h));}
   return area;
 }
 
 /***********************************************************/
-void traj(double t, double pars[], double pos[],
+void traj2(double t, double pars[], double pos[],
 	  double *zdot, double *rE, double *theta,
 	  double *rr, double *ff)
 {
@@ -122,7 +122,7 @@ void traj(double t, double pars[], double pos[],
 /***********************************************************/
 // Guts of the main code, adapted for more general interface
 // John Baker
-void calc_light_curve(double *times, long Nt, double *pars, double *template)
+void calc_light_curve2(double *times, long Nt, double *pars, double *template)
 {
   //times: input array of time sample points
   double R1 = 1.0; //units of RSUN
@@ -206,7 +206,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
 
   for (itime=0; itime<Nt; itime++){
     t=times[itime];
-    traj(t,pars,pos,&zdot,&rE,&theta,&rr,&ff);
+    traj2(t,pars,pos,&zdot,&rE,&theta,&rr,&ff);
     rr = rr/RSUN; //units of RSUN
     cos_ff = cos(ff);
     cos_2theta = cos(2.*theta);
@@ -252,7 +252,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template)
 /*given an array of observed magnitudes a_data at times t_data, with  measurment errors
  e_data, calculates the goodness-of-fit for the set of parameters P_*/
 
-double loglikelihood(double time[], double data[], double noise[],
+double loglikelihood2(double time[], double data[], double noise[],
 		     long N, double params[])
 {
   double *template;
@@ -264,7 +264,7 @@ double loglikelihood(double time[], double data[], double noise[],
   template = (double *)malloc(N*sizeof(double));
 	
   //compute template light curve
-  calc_light_curve(time,N,params,template);
+  calc_light_curve2(time,N,params,template);
 	
   //sum square of residual to get chi-squared
   chi2 = 0.;

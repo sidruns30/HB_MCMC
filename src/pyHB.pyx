@@ -4,6 +4,8 @@ import numpy as np
 
 cimport likelihood2
 cimport likelihood3
+import sys
+import traceback
 
 def lightcurve2(times,inpars):
   logM1, logM2, logP_day, e, inc_deg, omega_deg,omega0_deg, T0_day,log_rad1_rescale,log_rad2_rescale,logTanom,blend_frac,logFluxTESS=inpars
@@ -19,16 +21,16 @@ def lightcurve2(times,inpars):
   likelihood2.calc_light_curve(&ctimes[0],Nt,&pars[0],&ctemplate[0]);
   template=np.array(ctemplate)
   #return template+10**(log_blendFlux+logFluxTESS)
-  Flux_TESS = 10.**logFlux_TESS
+  Flux_TESS = 10.**logFluxTESS
   return 1*blend_frac + template*(1-blend_frac)
 
 
 def lightcurve3(times,inpars):
-  logM1, logM2, logP_day, e, inc_deg, omega_deg, T0_day, log_rad1_rescale, log_rad2_rescale, flux_tune, blend_frac=inpars
-  cdef double pars[12]
+  logM1, logM2, logP_day, e, inc_deg, omega0_deg, T0_day, log_rad1_rescale, log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, flux_tune, blend_frac=inpars
+  cdef double pars[16]
   #need to convert angles from rad to deg here
   radeg=180/np.pi
-  pars[:]=[  logM1, logM2, logP_day, e, inc_deg*radeg, omega_deg*radeg, 0, T0_day, log_rad1_rescale,log_rad2_rescale ]
+  pars[:]=[  logM1, logM2, logP_day, e, inc_deg*radeg, 0, omega0_deg*radeg, T0_day, log_rad1_rescale,log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2 ]
   times=np.array(times)
   cdef int Nt=len(times)
   cdef double[:] ctimes = times
@@ -49,10 +51,18 @@ def lightcurve3(times,inpars):
     double T0 = pars[7]*SEC_DAY;
     double rr1 = pow(10., pars[8]);
     double rr2 = pow(10., pars[9]);
+    // Limb and gravity darkening coefficients respectively
+    mu_1 = pars[10];
+    tau_1 = pars[11];
+    mu_2 = pars[12];
+    tau_2 = pars[13];
+    // Reflection coefficients
+    alpha_ref_1 = pars[14];
+    alpha_ref_2 = pars[15];
   '''
   likelihood3.calc_light_curve(&ctimes[0],Nt,&pars[0],&ctemplate[0]);
   template=np.array(ctemplate)
-  return ( 1*blend_frac + template*(1-blendFlux) ) * fluxtune
+  return ( 1*blend_frac + template*(1-blend_frac) ) * flux_tune
 
 class parspace:
   def __init__(self, *args):
@@ -122,7 +132,8 @@ sp2=parspace(
   #'log_rad2_resc', [ -0.25, 1.25 ],
   'logTanom', [ -0.5, 0.5 ],
   'blend_frac', [ 0, 1.0 ],
-  'logFluxTESS', [ -10.0, 10.0 ]
+  'logFluxTESS', [ -10.0, 10.0 ],
+  'ln_noise_resc', [ -0.2, 0.2 ]
 )
 
 sp3=parspace(
@@ -131,27 +142,40 @@ sp3=parspace(
   'logP', [ -2.0, 3.0 ],
   'e', [ 0, 1 ],
   'inc', [ 0, np.pi ],
-  'Omega', [ -np.pi, np.pi ],
-  'Omega0', [ -np.pi, np.pi ],
+  'omega0', [ -np.pi, np.pi ],
   'T0', [ -1000, 1000 ],
-  'logFluxTESS', [ -10.0, 10.0 ],
   'log_rad1_resc', [ -2, 2 ],
   'log_rad2_resc', [ -2, 2 ],
-  #'log_rad1_resc', [ -0.25, 1.25 ],
-  #'log_rad2_resc', [ -0.25, 1.25 ],
-  'logTanom', [ -0.5, 0.5 ],
+  'mu_1', [ 0.12, 0.20 ],
+  'tau_1', [ 0.30, 0.38 ],
+  'mu_2', [ 0.12, 0.20 ],
+  'tau_2', [ 0.30, 0.38 ],
+  'alpha_ref_1', [0.8,1.2],
+  'alpha_ref_2', [0.8,1.2],
   'blend_frac', [ 0.0, 1.0 ],
-  'flux_tune', [ 0.99, 1.01 ]
+  'flux_tune', [ 0.99, 1.01 ],
+  'ln_noise_resc', [ -0.2, 0.2 ]
 )
   
 
-def likelihood(times,fluxes,errs,pars):
-  #logM1, logM2, logP_day, e, inc_deg, omega_deg,omega0_deg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale,log_blendFlux=pars
+def likelihood(times,fluxes,errs,pars,lctype=3):
   minlike=-1e18
+  ln_noise_resc=pars[-1]
+  pars=pars[:-1]
   try:
-    modelfluxes=lightcurve(times, pars)
-    llike=-np.sum(((fluxes-modelfluxes)/errs)**2)/2
+    if lctype==2:
+      modelfluxes=lightcurve2(times, pars)
+    elif lctype==3:
+      modelfluxes=lightcurve3(times, pars)
+    else:
+      raise ValueError('Unknown light curve model type.')
+    noise_resc=np.exp(ln_noise_resc)
+    sigmas=errs*noise_resc
+    llike = - np.sum(((fluxes-modelfluxes)/sigmas)**2) - len(errs)*ln_noise_resc # - sum(np.log(2*np.pi*errs**2)) #last term is/would be constant.
   except:
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    print('likelihood exception:')
+    traceback.print_exception(exc_type, exc_value, exc_traceback, file=sys.stdout)
     llike=minlike
   if not llike>minlike:llike=minlike
   #print(llike)
