@@ -3,7 +3,6 @@ New version of likelihood that uses results from Engel et al 2020 to
 calculate the lightcurve. Equations are initally derived in Kopal 1958
 chapter 4, refined by Morris and then by Engel. The model includes
 tidal distortion, rotational flattening, reflection and eclipses.
-
 The parameters and their units are:
 M1:             Mass of star 1 (log Msun)
 M2:             Mass of star 2 (log Msun)
@@ -29,7 +28,7 @@ rr2:            Radius scaling factor for star 2
 #define MSUN 1.9885e33
 #define RSUN 6.955e10
 #define SEC_DAY 86400.0
-#define ALPHA_FREE 1 // to set coefficitents as parameters in the model
+#define ALPHA_FREE 0 // to set coefficitents as parameters in the model
 #if ALPHA_FREE == 1
     #define NPARS 16
 #else

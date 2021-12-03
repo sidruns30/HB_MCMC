@@ -28,16 +28,16 @@ Task list:
 
 # Set parameters here
 parameters = {
-    'M1'        : 1.1843,
-    'M2'        : 0.8549,    
-    'P'         : .7,
-    'e'         : 0.35047,
-    'inc'       : 1.562449*180/3.141,
-    'Omega'     : 0.950066,    
-    'omega0'    : 2.7987,
-    'T0'        : 0.,
-    'rr1'       : -0.1037027,
-    'rr2'       : -0.542256,
+    'M1'        : -9.24270e-01,
+    'M2'        : -7.47407e-01,    
+    'P'         : 7.96050e-01 ,
+    'e'         : 3.17503e-01,
+    'inc'       : 1.49535e+00*180/3.141,
+    'Omega'     :  2.23680e+00 ,    
+    'omega0'    : -2.48707e+00 ,
+    'T0'        : 6.56090e+01 ,
+    'rr1'       : 6.44932e-01 ,
+    'rr2'       : 8.65771e-01 ,
 }
 
 # Choice of model "engel" or "morris"
@@ -316,8 +316,8 @@ class engel:
 
         for i, nu in enumerate(self.nu_arr):
             beam1 = self.beaming(self.M2, self.vrad_over_m[i], alpha_beam, nu, self.M1, self.Pdays, self.inc, self.omega0, self.e)
-            ellip1, CONS1, CONS2, CONS3, S1, C2_1, C2_2, S3, C4 = self.ellipsoidal(mu, tau, self.Pdays, self.M1, self.M2, self.e, self.inc, self.omega0, nu, R1, ar, components=True)
-            ref1 = self.reflection(self.Pdays, self.M1, self.M2, self.e, self.inc, self.omega0, nu, R2, alpha_ref)
+            ellip1, CONS1, CONS2, CONS3, S1, C2_1, C2_2, S3, C4 = self.ellipsoidal(.835, .435, self.Pdays, self.M1, self.M2, self.e, self.inc, self.omega0, nu, R1, ar, components=True)
+            ref1 = self.reflection(self.Pdays, self.M1, self.M2, self.e, self.inc, self.omega0, nu, R2, .48)
 
             # Add in the individua ellipsoidal constributions
             CONS1_arr[i] += Flux1 *CONS1
@@ -330,8 +330,8 @@ class engel:
             C4_arr[i] += Flux1 *C4
 
             beam2 = self.beaming(self.M1, self.vrad_over_m[i], alpha_beam, nu, self.M2, self.Pdays, self.inc, self.omega0+PI, self.e)
-            ellip2, CONS1, CONS2, CONS3, S1, C2_1, C2_2, S3, C4  = self.ellipsoidal(mu, tau, self.Pdays, self.M2, self.M1, self.e, self.inc, (self.omega0+PI), nu, R2, ar, components=True)
-            ref2 = self.reflection(self.Pdays, self.M2, self.M1, self.e, self.inc, (self.omega0+PI), nu, R1, alpha_ref)
+            ellip2, CONS1, CONS2, CONS3, S1, C2_1, C2_2, S3, C4  = self.ellipsoidal(.94, .56, self.Pdays, self.M2, self.M1, self.e, self.inc, (self.omega0+PI), nu, R2, ar, components=True)
+            ref2 = self.reflection(self.Pdays, self.M2, self.M1, self.e, self.inc, (self.omega0+PI), nu, R1, .03)
 
             # Add in the individua ellipsoidal constributions
             CONS1_arr[i] += Flux2 *CONS1
@@ -500,10 +500,10 @@ def compute_lc(times, parameters, model_type, plot_comp, **kwargs):
         if (Z2arr[i] > Z1arr[i]): 
             #print(area, R1, R2)
             Amag2[i] -= area * Flux2 / (PI*SQR(R2))
-            Aecl[i] = -area * Flux2 / (PI*SQR(R2))
+            Aecl[i] = -area #/ (PI*SQR(R2)) 
         elif (Z2arr[i] < Z1arr[i]): 
             Amag1[i] -= area * Flux1 / (PI*SQR(R1))
-            Aecl[i] = - area * Flux1 / (PI*SQR(R1))
+            Aecl[i] = - area  #/ (PI*SQR(R1)) 
 
     # Full lightcurve
     Afull = Amag1 + Amag2
@@ -528,7 +528,7 @@ def compute_lc(times, parameters, model_type, plot_comp, **kwargs):
         Z2arr /= RSUN
 
         # Load numpy file
-        data = np.loadtxt("output_lc.txt")
+        #data = np.loadtxt("output_lc.txt")
 
         for index in range(0, 1000, 1000):
             # Set figures and axes
@@ -564,8 +564,10 @@ def compute_lc(times, parameters, model_type, plot_comp, **kwargs):
             ax4.set_title("Ellipsoidal Phi Variation")
 
             ax5 = fig.add_subplot(gs[6:8, 5:])
-            ax5.set_ylabel("$\Delta F / F$")
-            ax5.set_title("Reflection Variation")
+            ax5.set_ylabel("$RSUN$")
+            ax5.set_title("Radial and angular separation")
+            ax7 = ax5.twinx()
+            ax7.set_ylabel("$\\nu$")
 
             ax6 = fig.add_subplot(gs[8:, 5:])
             ax6.set_ylabel("$\Delta F$")
@@ -601,7 +603,7 @@ def compute_lc(times, parameters, model_type, plot_comp, **kwargs):
 
             ax2.plot(times, Ebeam, "o", label="Engel")
             ax2.plot(times, Mdop, "o",label="Morris")
-            ax2.plot(data[:,0], data[:,2], ".", label="C model")
+            #ax2.plot(data[:,0], data[:,2], ".", label="C model")
             ax2.plot(times[index], Ebeam[index], "x")
             ax2.plot(times[index], Mdop[index], "x")
 
@@ -613,13 +615,16 @@ def compute_lc(times, parameters, model_type, plot_comp, **kwargs):
             
             ax4.plot(times, (C2_1_arr + C2_2_arr + S1_arr + S3_arr + C4_arr +CONS1_arr + CONS2_arr + CONS3_arr), "o", label="Engel")
             ax4.plot(times, Mellip_var, "o", label="Morris")
-            ax4.plot(data[:,0], data[:,3], ".", label="C model")
+            #ax4.plot(data[:,0], data[:,3], ".", label="C model")
             ax4.plot(times[index], (C2_1_arr + C2_2_arr + S1_arr + S3_arr + C4_arr)[index], "x")
             ax4.plot(times[index], Mellip_var[index], "x")
             
-            ax5.plot(times, Eref, "o", label="Engel")
-            ax5.plot(times[index], Eref[index], "x")
-            ax5.plot(data[:,0], data[:,4], ".", label="C model")
+            '''Plotting other things besides reflection'''
+            ax5.plot(times, (X1arr-X2arr)/RSUN, 'r', times,  (Y1arr-Y2arr)/RSUN, "b")
+            #ax7.plot(times, X2arr/RSUN, "y", times, Y2arr/RSUN, "g")
+            #ax7.plot(times, nu_arr, "r-", label="Engel")
+            #ax7.plot(times[index], nu_arr[index]/RSUN, "rx")
+            #ax5.plot(data[:,0], data[:,4], ".", label="C model")
 
             Engel_full = Ebeam + Eellip + Aecl + Eref
             Engel_full -= np.median(Engel_full)
@@ -629,15 +634,16 @@ def compute_lc(times, parameters, model_type, plot_comp, **kwargs):
             Morris_full -= np.median(Morris_full)
             Morris_full += 1
 
-            data[:,1] -= np.median(data[:,1])
-            data[:,1] += 1
+            #data[:,1] -= np.median(data[:,1])
+            #data[:,1] += 1
 
-            ax6.plot(times, Engel_full, "o", label="Engel")
-            ax6.plot(times, Morris_full, "o", label="Morris")
-            ax6.plot(data[:,0], data[:,1], ".", label="C model")
-            ax6.plot(times[index], Engel_full[index], "x")
-            ax6.plot(times[index], Morris_full[index], "x")
-            ax6.set_ylim((.99, 1.01))
+            #ax6.plot(times, Engel_full, "-", label="Engel")
+            #ax6.plot(times, Morris_full, "o", label="Morris")
+            #ax6.plot(data[:,0], data[:,1], ".", label="C model")
+            ax6.plot(times, Aecl, "-")
+            ax6.plot(times[index], Aecl[index], "-")
+            #ax6.set_ylim((.8, 1.01))
+            #ax6.set_xlim((1.2, 1.8))
 
             for ax in [ax1,ax2,ax3,ax4,ax5,ax6]:    ax.legend(prop={"size":8})
             plt.savefig("test.png")

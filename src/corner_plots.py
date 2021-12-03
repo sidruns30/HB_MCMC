@@ -9,7 +9,7 @@ lc_id = sys.argv[1]
 def load_chain(lc_id, remove_period=True):
     cwd = os.getcwd()
     chain_dir = cwd + "/../data/chains/chain.%s.txt" % lc_id
-    chain = np.loadtxt(chain_dir, max_rows=1900)
+    chain = np.loadtxt(chain_dir, skiprows=32500, max_rows=1000000)
     # remove the last column
     chain = chain[:-1,:]
     if chain.shape[-1] > 11: alpha_flag = True
@@ -34,6 +34,14 @@ def load_chain(lc_id, remove_period=True):
     return logL, samples, labels
 
 logL, samples, labels = load_chain(lc_id)
+samples = samples[::50,:]
+logL_0 = logL[::50]
+iternum = 10*np.arange(len(logL_0))
 
-fig = corner.corner(samples, labels=labels)
+
+#plt.plot(iternum, logL_0)
+print(samples.shape)
+plt.hist(np.power(10, samples[10000:,0]) / np.power(10, samples[10000:,1]))
+#fig = corner.corner(samples, labels=labels,quantiles=[0.16, 0.5, 0.84],
+#                       show_titles=True, title_kwargs={"fontsize": 12})
 plt.savefig("test.png")
