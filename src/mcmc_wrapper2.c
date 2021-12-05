@@ -435,12 +435,10 @@ int main(int
     // index[0]: index of coldest chain
     //down-sample chains until I get a better proposal
     if(iter%10==0) {
-      for (int z=0;z<NCHAINS;z++){
       //print parameter chains
-        fprintf(chain_file,"%ld %.12g ",iter/10,logLx[index[z]]);
-        for(i=0; i<NPARS; i++) fprintf(chain_file,"%.12g\t",x[index[z]][i]);
-        fprintf(chain_file,"\n");
-      }
+      fprintf(chain_file,"%ld %.12g ",iter/10,logLx[index[0]]);
+      for(i=0; i<NPARS; i++) fprintf(chain_file,"%.12g\t",x[index[0]][i]);
+      fprintf(chain_file,"\n");
       //print log likelihood chains
       fprintf(logL_file,"%ld ",iter/10);
       for(i=0; i<NCHAINS; i++) fprintf(logL_file,"%.12g\t",logLx[index[i]]);

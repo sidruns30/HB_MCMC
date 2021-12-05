@@ -30,7 +30,7 @@ rr2:            Radius scaling factor for star 2
 #define SEC_DAY 86400.0
 #define ALPHA_FREE 0 // to set coefficitents as parameters in the model
 #if ALPHA_FREE == 1
-    #define NPARS 16
+    #define NPARS 18
 #else
     #define NPARS 10
 #endif
@@ -430,11 +430,8 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     double rr1 = pow(10., pars[8]);
     double rr2 = pow(10., pars[9]);
     
-    // Beaming coefficients
-    int compute_alpha_beam = 0;
-    double alpha_beam_1 = 1.;
-    double alpha_beam_2 = 1.;
-    double mu_1, mu_2, tau_1, tau_2, alpha_ref_1, alpha_ref_2;
+    // Alpha coefficients
+    double alpha_beam_1, alpha_beam_2, mu_1, mu_2, tau_1, tau_2, alpha_ref_1, alpha_ref_2;
     
     if (ALPHA_FREE == 1){
         // Limb and gravity darkening coefficients respectively
@@ -445,8 +442,13 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
         // Reflection coefficients
         alpha_ref_1 = pars[14];
         alpha_ref_2 = pars[15];
+        // Beaming coefficients
+        alpha_beam_1 = pars[16];
+        alpha_beam_2 = pars[17];
     }
     else{
+        alpha_beam_1 = 1.;
+        alpha_beam_2 = 1.;
         mu_1 = .16;
         tau_1 = .344;
         mu_2 = .16;
@@ -706,6 +708,16 @@ void set_limits(bounds limited[], bounds limits[])
     limited[15].lo = 1;
     limits[15].lo = 0.;
     limited[15].hi = 1.;
-    limits[15].hi = 1.;
+    limits[15].hi = 2.;
+    // limits on beaming coefficients on star 1
+    limited[16].lo = 1;
+    limits[16].lo = 0.;
+    limited[16].hi = 1.;
+    limits[16].hi = 2.;
+    // limits on beaming coefficients on star 2
+    limited[17].lo = 1;
+    limits[17].lo = 0.;
+    limited[17].hi = 1.;
+    limits[17].hi = 2.;
   }
 }
