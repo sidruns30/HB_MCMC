@@ -130,16 +130,16 @@ int main(int
 
   strcat(subparname,"../data/subpars/subpar.");
   strcat(subparname,RUN_ID);
-  strcat(subparname,".txt");
+  strcat(subparname,".dat");
   strcat(parname,"../data/pars/par.");
   strcat(parname,RUN_ID);
-  strcat(parname,".txt");
+  strcat(parname,".dat");
   strcat(chainname,"../data/chains/chain.");
   strcat(chainname,RUN_ID);
-  strcat(chainname,".txt");
+  strcat(chainname,".dat");
   strcat(logLname,"../data/logL/logL.");
   strcat(logLname,RUN_ID);
-  strcat(logLname,".txt");
+  strcat(logLname,".dat");
   strcat(outname,"../data/lightcurves/mcmc_lightcurves/");
   strcat(outname,RUN_ID);
   strcat(outname,".out");
@@ -213,8 +213,7 @@ int main(int
     if (burn_in == 1) {
       for(j=0; j<NCHAINS; j++) {
         if (param_file_flag != 1){
-          double rnum = ran2(&seed);
-          P_[j][i] = limits[i].lo + rnum*(limits[i].hi - limits[i].lo);
+          P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
           x[j][i]  = P_[j][i];
         }
         
@@ -224,8 +223,7 @@ int main(int
     if (burn_in == 2) {
       for(j=0; j<NCHAINS; j++) {
         if (param_file_flag != 1){
-          double rnum = ran2(&seed);
-          P_[j][i] = limits[i].lo + rnum*(limits[i].hi - limits[i].lo);
+          P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
           if (i == 2) P_[j][i] = ls_period;  // Keep the period
           if (i == 7) P_[j][i] = 0;          // Set T0 = 0
           x[j][i]  = P_[j][i];
@@ -437,11 +435,12 @@ int main(int
     if(iter%10==0) {
       //print parameter chains
       fprintf(chain_file,"%ld %.12g ",iter/10,logLx[index[0]]);
-      for(i=0; i<NPARS; i++) fprintf(chain_file,"%.12g\t",x[index[0]][i]);
+      for(i=0; i<NPARS; i++) fprintf(chain_file,"%.12g ",x[index[0]][i]);
       fprintf(chain_file,"\n");
+      
       //print log likelihood chains
       fprintf(logL_file,"%ld ",iter/10);
-      for(i=0; i<NCHAINS; i++) fprintf(logL_file,"%.12g\t",logLx[index[i]]);
+      for(i=0; i<NCHAINS; i++) fprintf(logL_file,"%.12g ",logLx[index[i]]);
       fprintf(logL_file,"\n"); 
     }
     
@@ -584,12 +583,11 @@ double ran2(long *idum)
 	static long iy=0;
 	static long iv[NTAB];
 	double temp;
-	//printf("test 1 \n");
+	
 	if (*idum <= 0) {
 		if (-(*idum) < 1) *idum=1;
 		else *idum = -(*idum);
 		idum2=(*idum);
-    //printf("test 2 \n");
 		for (j=NTAB+7;j>=0;j--) {
 			k=(*idum)/IQ1;
 			*idum=IA1*(*idum-k*IQ1)-k*IR1;
@@ -597,7 +595,6 @@ double ran2(long *idum)
 			if (j < NTAB) iv[j] = *idum;
 		}
 		iy=iv[0];
-    //printf("test 3 \n");
 	}
 	k=(*idum)/IQ1;
 	*idum=IA1*(*idum-k*IQ1)-k*IR1;
@@ -606,14 +603,11 @@ double ran2(long *idum)
 	idum2=IA2*(idum2-k*IQ2)-k*IR2;
 	if (idum2 < 0) idum2 += IM2;
 	j=iy/NDIV;
-  //printf("test 4 \n");
 	iy=iv[j]-idum2;
 	iv[j] = *idum;
 	if (iy < 1) iy += IMM1;
-  //printf("test 5 \n");
 	if ((temp=AM*iy) > RNMX) return RNMX;
 	else return temp;
-  //printf("test 6 \n");
 }
 // gaussian random number
 double gasdev2(long *idum)
