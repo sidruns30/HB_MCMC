@@ -42,10 +42,10 @@ iternum = 10*np.arange(len(logL_0))
 
 #plt.plot(iternum, logL_0)
 #print(samples.shape)
-#plt.hist(np.power(10, samples[1000:,0]) / np.power(10, samples[1000:,1]))
+plt.hist(np.power(10, samples[1000:,0]) / np.power(10, samples[1000:,1]))
 #fig = corner.corner(samples, labels=labels,quantiles=[0.16, 0.5, 0.84],
 #                       show_titles=True, title_kwargs={"fontsize": 12})
 #plt.savefig("../data/figures/corner/%s.png" %lc_id)
 #plt.close()
-plt.plot(logL_0)
-plt.savefig("test.png")
+#plt.plot(logL_0)
+#plt.savefig("test.png")
