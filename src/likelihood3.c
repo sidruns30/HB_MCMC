@@ -28,7 +28,7 @@ rr2:            Radius scaling factor for star 2
 #define MSUN 1.9885e33
 #define RSUN 6.955e10
 #define SEC_DAY 86400.0
-#define ALPHA_FREE 0 // to set coefficitents as parameters in the model
+#define ALPHA_FREE 1 // to set coefficitents as parameters in the model
 #if ALPHA_FREE == 1
     #define NPARS 18
 #else
@@ -483,12 +483,6 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     Norm1 = SQR(R1) * QUAD(Teff1) / (SQR(R1) * QUAD(Teff1) + SQR(R2) * QUAD(Teff2));
     Norm2 = SQR(R2) * QUAD(Teff2) / (SQR(R1) * QUAD(Teff1) + SQR(R2) * QUAD(Teff2));
 
-    // Set alpha_beam
-    if (compute_alpha_beam == 1) {
-        alpha_beam_1 = get_alpha_beam(log10(Teff1 * 5580));
-        alpha_beam_2 = get_alpha_beam(log10(Teff2 * 5580));
-    }
-
     // Semi majot axis (cgs calculation)
     double Mtot = (M1+M2)*MSUN;
     double a = pow(G*Mtot*P*P/(4.0*PI*PI),1./3.);
@@ -681,34 +675,34 @@ void set_limits(bounds limited[], bounds limits[])
     // Limits of the alpha_coefficients
     // limits on limb darkening coefficient for star 1
     limited[10].lo = 1;
-    limits[10].lo = 0.;
+    limits[10].lo = 0.12;
     limited[10].hi = 1.;
-    limits[10].hi = 1.;
+    limits[10].hi = 2.;
     // limits on gravity darkening coefficient for star 1
     limited[11].lo = 1;
-    limits[11].lo = 0.;
+    limits[11].lo = 0.3;
     limited[11].hi = 1.;
-    limits[11].hi = 1.;
+    limits[11].hi = 0.38;
     // limits on limb darkening coefficient for star 2
     limited[12].lo = 1;
-    limits[12].lo = 0.;
+    limits[12].lo = 0.12;
     limited[12].hi = 1.;
-    limits[12].hi = 1.;
+    limits[12].hi = .2;
     // limits on gravity darkening coefficient for star 2
     limited[13].lo = 1;
-    limits[13].lo = 0.;
+    limits[13].lo = 0.3;
     limited[13].hi = 1.;
-    limits[13].hi = 1.;
+    limits[13].hi = 0.38;
     // limits on reflection coefficients on star 1
     limited[14].lo = 1;
-    limits[14].lo = 0.;
+    limits[14].lo = 0.8;
     limited[14].hi = 1.;
-    limits[14].hi = 1.;
+    limits[14].hi = 1.2;
     // limits on reflection coefficients on star 2
     limited[15].lo = 1;
-    limits[15].lo = 0.;
+    limits[15].lo = 0.8;
     limited[15].hi = 1.;
-    limits[15].hi = 2.;
+    limits[15].hi = 1.2;
     // limits on beaming coefficients on star 1
     limited[16].lo = 1;
     limits[16].lo = 0.;
