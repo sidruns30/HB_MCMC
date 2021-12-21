@@ -1,3 +1,5 @@
+# cython: language_level = 3
+
 cimport cython
 #cdef void calc_light_curve(double* times, double Nt, double*pars, double *template);
 import numpy as np
@@ -8,11 +10,11 @@ import sys
 import traceback
 
 def lightcurve2(times,inpars):
-  logM1, logM2, logP_day, e, inc_deg, omega_deg,omega0_deg, T0_day,log_rad1_rescale,log_rad2_rescale,logTanom,blend_frac,logFluxTESS=inpars
+  logM1, logM2, logP_day, e, inc, omega, omega0, T0_day,log_rad1_rescale,log_rad2_rescale,logTanom,blend_frac,logFluxTESS=inpars
   cdef double pars[12]
   #need to convert angles from rad to deg here
   radeg=180/np.pi
-  pars[:]=[  logM1, logM2, logP_day, e, inc_deg*radeg, omega_deg*radeg,omega0_deg*radeg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale, logTanom ]
+  pars[:]=[  logM1, logM2, logP_day, e, inc*radeg, omega*radeg,omega0*radeg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale, logTanom ]
   times=np.array(times)
   cdef int Nt=len(times)
   cdef double[:] ctimes = times
@@ -26,11 +28,11 @@ def lightcurve2(times,inpars):
 
 
 def lightcurve3(times,inpars):
-  logM1, logM2, logP_day, e, inc_deg, omega0_deg, T0_day, log_rad1_rescale, log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, flux_tune, blend_frac=inpars
-  cdef double pars[16]
+  logM1, logM2, logP_day, e, inc, omega0, T0_day, log_rad1_rescale, log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, ln_beam_resc_1, ln_beam_resc_2, ln_alp_Teff_1, ln_alp_Teff_2, blend_frac, flux_tune=inpars
+  cdef double pars[20]
   #need to convert angles from rad to deg here
   radeg=180/np.pi
-  pars[:]=[  logM1, logM2, logP_day, e, inc_deg*radeg, 0, omega0_deg*radeg, T0_day, log_rad1_rescale,log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2 ]
+  pars[:]=[  logM1, logM2, logP_day, e, inc, 0, omega0, T0_day, log_rad1_rescale,log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, np.exp(ln_beam_resc_1), np.exp(ln_beam_resc_2), np.exp(ln_alp_Teff_1), np.exp(ln_alp_Teff_2) ]
   times=np.array(times)
   cdef int Nt=len(times)
   cdef double[:] ctimes = times
@@ -152,11 +154,14 @@ sp3=parspace(
   'tau_2', [ 0.30, 0.38 ],
   'alpha_ref_1', [0.8,1.2],
   'alpha_ref_2', [0.8,1.2],
+  'ln_beam_resc_1', [-0.1,0.1],
+  'ln_beam_resc_2', [-0.1,0.1],
+  'ln_alp_Teff_1', [-0.1,0.1],
+  'ln_alp_Teff_2', [-0.1,0.1],
   'blend_frac', [ 0.0, 1.0 ],
   'flux_tune', [ 0.99, 1.01 ],
   'ln_noise_resc', [ -0.2, 0.2 ]
 )
-  
 
 def likelihood(times,fluxes,errs,pars,lctype=3):
   minlike=-1e18
