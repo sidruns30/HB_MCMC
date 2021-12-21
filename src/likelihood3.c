@@ -410,9 +410,9 @@ Parameters:
         M2:         Mass of secondary (log Msun)
         P:          Period (log days)
         e:          Eccentricity
-        inc:        Inclination (deg)
-        Omega:      Long of ascending node (deg)
-        omega0:     Angle or periastron (deg)
+        inc:        Inclination (rad)
+        Omega:      Long of ascending node (rad)
+        omega0:     Angle or periastron (rad)
         T0:         Inital Time (days)
         Flux_TESS:  Flux scaling factor
         rr1:        Radius scaling factor of primary (log)
