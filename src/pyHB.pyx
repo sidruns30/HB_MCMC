@@ -1,3 +1,5 @@
+# cython: language_level = 3
+
 cimport cython
 #cdef void calc_light_curve(double* times, double Nt, double*pars, double *template);
 import numpy as np
