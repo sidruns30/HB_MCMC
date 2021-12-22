@@ -17,7 +17,7 @@
 #define SQR(x) ((x)*(x))
 #define CUBE(x) ((x)*(x)*(x))
 #define QUAD(x) ((x)*(x)*(x)*(x))
-#define NPARS 11
+//#define NPARS 11
 
 static inline void swap2(double *x, double *y){
   double temp = *x;
