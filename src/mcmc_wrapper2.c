@@ -64,22 +64,21 @@ void free_3d(double ***arr, int size1, int size2){
 // Function to check if (parameter) file exists
 int exists(const char *fname){
     FILE *file;
-    if ((file = fopen(fname, "r"))){
-        fclose(file);
-        return 1;
+    if (access(fname, R_OK) == 0){
+      return 1;
     }
-    return 0;
+    else {return 0;}
 }
 
 int main(int
  argc, char* argv[])
 {
-  //omp_set_num_threads(1);
+  //omp_set_num_threads(50);
   /* Siddhant: Adding small variable descriptions */
   long Niter;                     // Chain iterations
   double **P_;                    // Contains parameters - check why different from x - seems uneccessary
   double P_0[NPARS];            
-  double *y;                      // Updated Parameter
+  //double *y;                      // Updated Parameter
   double **x;                     // Parameter chains
   double ***history;              // Chain history
   double xmap[NPARS];           // Contains the chain with best paramters
@@ -145,6 +144,22 @@ int main(int
   strcat(outname,".out");
   printf("%s\n",parname);
 
+  int run = atoi(argv[6]);
+  char suffix[30];
+  sprintf(suffix, "%d", run);
+  strcat(subparname, suffix);
+  strcat(parname, suffix);
+  strcat(chainname, suffix);
+  strcat(logLname, suffix);
+  strcat(outname, suffix);
+
+  printf("%s\n", subparname);
+  printf("%s\n", parname);
+  printf("%s\n", chainname);
+  printf("%s\n", logLname);
+  printf("%s\n", outname);
+  printf("felloo");
+
   /*Use binned period if period is found, otherwise use the full lightcurve*/
   if (burn_in == 2){
   strcpy(dfname,"../data/lightcurves/folded_lightcurves/");
@@ -170,7 +185,6 @@ int main(int
     for(j=0;j<NPAST;j++)history[i][j]=(double *)malloc(NPARS*sizeof(double));
   }
 
-  y = (double *)malloc(NPARS*sizeof(double));
   sigma = (double *)malloc(NPARS*sizeof(double));
   scale  = 1.0/((double)(NPARS));
   //
@@ -197,6 +211,7 @@ int main(int
       }
   
     else {
+      seed = rand();
       tmp = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
       printf("\t assinging random pars \n");
       }
@@ -213,6 +228,7 @@ int main(int
     if (burn_in == 1) {
       for(j=0; j<NCHAINS; j++) {
         if (param_file_flag != 1){
+          seed = rand();
           P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
           x[j][i]  = P_[j][i];
         }
@@ -223,6 +239,7 @@ int main(int
     if (burn_in == 2) {
       for(j=0; j<NCHAINS; j++) {
         if (param_file_flag != 1){
+          seed = rand();
           P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
           if (i == 2) P_[j][i] = ls_period;  // Keep the period
           if (i == 7) P_[j][i] = 0;          // Set T0 = 0
@@ -353,8 +370,11 @@ int main(int
   for (iter=0; iter<Niter; iter++) {
     if(iter % 10 == 0) {begin = clock();}
     //loop over chains
-    //#pragma omp for schedule(static)
+
+    #pragma omp parallel for //schedule(static) shared(history, logLx, x)
     for(j=0; j<NCHAINS; j++) {
+      double *y = (double *)malloc(NPARS*sizeof(double));
+      seed = rand();
       alpha = ran2(&seed);  
       jscale = pow(10.,-6.+6.*alpha);
       /* propose new solution */
@@ -414,6 +434,8 @@ int main(int
       /*  fill history  */
       k = iter - (iter/NPAST)*NPAST;
       for(i=0; i<NPARS; i++) history[j][k][i] = x[index[j]][i];
+      free_1d(y);
+      //#pragma omp barrier
     }
     /********Chain Loop ends**********/
     // Call timer after 10 iterations
@@ -471,6 +493,7 @@ int main(int
       if (ALPHA_FREE == 1){
          fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e\n",
 	       x[index[0]][11],x[index[0]][12],x[index[0]][13],x[index[0]][14],x[index[0]][15]);
+        fprintf(param_file,"%12.5e %12.5e\n",x[index[0]][16],x[index[0]][17]);
       }
       fclose(param_file);
     }
@@ -493,6 +516,8 @@ int main(int
   if (ALPHA_FREE == 1){
     fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e\n",
 	  x[index[0]][11],x[index[0]][12],x[index[0]][13],x[index[0]][14],x[index[0]][15]);
+    fprintf(param_file,"%12.5e %12.5e\n",x[index[0]][16],x[index[0]][17]);
+
   }
   fclose(param_file);
 
@@ -500,7 +525,6 @@ int main(int
   free_2d(P_, NCHAINS);
   free_2d(x, NCHAINS);
   free_3d(history, NCHAINS, NPAST);
-  free_1d(y);
   free_1d(sigma);
   free_1d(rdata);
   free(index);
