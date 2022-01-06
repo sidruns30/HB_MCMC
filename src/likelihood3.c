@@ -210,7 +210,7 @@ double get_alpha_beam(double logT){
     double logTs[4] = {3.5, 3.7, 3.9, 4.5};
 
     // Return endpoints if temperature is outside the domain
-    if (logT > logTs[4]) return 1.2/4;
+    if (logT > logTs[3]) return 1.2/4;
     if (logT < logTs[0]) return 6.5/4;
 
     int j = 4;
