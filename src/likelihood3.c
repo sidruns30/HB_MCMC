@@ -30,14 +30,9 @@ rr2:            Radius scaling factor for star 2
 #define RSUN 6.955e10
 #define SEC_DAY 86400.0
 #define ALPHA_FREE 1 // to set coefficitents as parameters in the model
-#define ALPHA_MORE 0 // to add even more flexible coefficients
 #if ALPHA_FREE == 1
-  #if ALPHA_MORE == 1
     #define NPARS 20
   #else
-    #define NPARS 16
-  #endif
-#else
     #define NPARS 10
 #endif
 
@@ -455,13 +450,10 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
         // Reflection coefficients
         alpha_ref_1 = pars[14];
         alpha_ref_2 = pars[15];
-	if (ALPHA_MORE ==1){
-	  //extra alphas
-	  extra_alpha_beam_1 = pars[16];
-	  extra_alpha_beam_1 = pars[17];
-	  alpha_Teff_1 = pars[18];
-	  alpha_Teff_2 = pars[19];
-	}
+        extra_alpha_beam_1 = pars[16];
+        extra_alpha_beam_1 = pars[17];
+        alpha_Teff_1 = pars[18];
+        alpha_Teff_2 = pars[19];
     }
     else{
         mu_1 = .16;
@@ -723,27 +715,25 @@ void set_limits(bounds limited[], bounds limits[])
     limits[14].lo = 0.;
     limited[14].hi = 1.;
     limits[14].hi = 1.;
-    if (ALPHA_MORE == 1){
-      // limits on extra beaming coefficient for star 1
-      limited[16].lo = 1;
-      limits[16].lo = 0.9;
-      limited[16].hi = 1;
-      limits[16].hi = 1.1;
-      // limits on extra beaming coefficient for star 2
-      limited[17].lo = 1;
-      limits[17].lo = 0.9;
-      limited[17].hi = 1;
-      limits[17].hi = 1.1;
-      // limits on Teff coefficient for star 1
-      limited[18].lo = 1;
-      limits[18].lo = 0.9;
-      limited[18].hi = 1;
-      limits[18].hi = 1.1;
-      // limits on Teff coefficient for star 2
-      limited[19].lo = 1;
-      limits[19].lo = 0.9;
-      limited[19].hi = 1;
-      limits[19].hi = 1.1;
-    }
+    // limits on extra beaming coefficient for star 1
+    limited[16].lo = 1;
+    limits[16].lo = 0.9;
+    limited[16].hi = 1;
+    limits[16].hi = 1.1;
+    // limits on extra beaming coefficient for star 2
+    limited[17].lo = 1;
+    limits[17].lo = 0.9;
+    limited[17].hi = 1;
+    limits[17].hi = 1.1;
+    // limits on Teff coefficient for star 1
+    limited[18].lo = 1;
+    limits[18].lo = 0.9;
+    limited[18].hi = 1;
+    limits[18].hi = 1.1;
+    // limits on Teff coefficient for star 2
+    limited[19].lo = 1;
+    limits[19].lo = 0.9;
+    limited[19].hi = 1;
+    limits[19].hi = 1.1;
   }
 }
