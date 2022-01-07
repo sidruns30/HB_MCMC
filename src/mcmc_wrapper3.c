@@ -576,14 +576,11 @@ void initialize_proposals(struct globals *glb)
     glb->sigma[13] = 1.0e-2;     // gravity darkening 2
     glb->sigma[14] = 1.0e-2;     // reflection 1
     glb->sigma[15] = 1.0e-2;     // reflection 2
-    if (ALPHA_MORE == 1)
-    {
-      glb->sigma[16] = 1.0e-2;     // extra beaming 1
-      glb->sigma[17] = 1.0e-2;     // extra beaming 2
-      glb->sigma[18] = 1.0e-2;     // Teff 1
-      glb->sigma[19] = 1.0e-2;     // Teff 2
-      glb->sigma[20] = 1.0e-2;     // Blending
-    }
+    glb->sigma[16] = 1.0e-2;     // extra beaming 1
+    glb->sigma[17] = 1.0e-2;     // extra beaming 2
+    glb->sigma[18] = 1.0e-2;     // Teff 1
+    glb->sigma[19] = 1.0e-2;     // Teff 2
+    glb->sigma[20] = 1.0e-2;     // Blending
   }
 }
 
