@@ -7,7 +7,7 @@
 #include <omp.h>
 #include <unistd.h>
 #include "likelihood3.c"
-//#include "extra.c"
+#include "extra.c"
 
 #define NCHAINS 50
 #define NPAST 500 // Relevant for differential evolution

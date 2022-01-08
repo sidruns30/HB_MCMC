@@ -30,9 +30,19 @@ rr2:            Radius scaling factor for star 2
 #define RSUN 6.955e10
 #define SEC_DAY 86400.0
 #define ALPHA_FREE 1 // to set coefficitents as parameters in the model
+#define ALPHA_MORE 1 // to add even more flexible coefficients
+#define BLENDING 1 // Blending fraction (currently only works when alpha free and alpha more are enabled)
 #if ALPHA_FREE == 1
-    #define NPARS 20
+  #if ALPHA_MORE == 1
+    #if BLENDING == 1
+        #define NPARS 22
+    #else
+        #define NPARS 20
+    #endif
   #else
+    #define NPARS 16
+  #endif
+#else
     #define NPARS 10
 #endif
 
@@ -440,6 +450,8 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     double extra_alpha_beam_1 = 1.;
     double extra_alpha_beam_2 = 1.;
     double mu_1, mu_2, tau_1, tau_2, alpha_ref_1, alpha_ref_2;
+    double blending = 0.;
+    double flux_tune = 1.;
     
     if (ALPHA_FREE == 1){
         // Limb and gravity darkening coefficients respectively
@@ -450,10 +462,20 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
         // Reflection coefficients
         alpha_ref_1 = pars[14];
         alpha_ref_2 = pars[15];
-        extra_alpha_beam_1 = pars[16];
-        extra_alpha_beam_1 = pars[17];
-        alpha_Teff_1 = pars[18];
-        alpha_Teff_2 = pars[19];
+	if (ALPHA_MORE ==1){
+	  //extra alphas
+	  extra_alpha_beam_1 = pow(10., pars[16]);//pow(10., pars[16]);
+	  extra_alpha_beam_1 = pow(10., pars[17]);//pow(10., pars[17]);
+	  alpha_Teff_1 = pow(10., pars[18]);//pow(10., pars[18]);
+	  alpha_Teff_2 = pow(10., pars[19]);//pow(10., pars[19]);
+
+        if (BLENDING == 1){
+        blending = pars[20];
+        flux_tune = pars[21];
+        }
+	}
+
+
     }
     else{
         mu_1 = .16;
@@ -579,8 +601,10 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
 
     // Normalize the lightcurve
     remove_median(template, Nt);
-    for (int i=0; i<Nt; i++) template[i] += 1;
-
+    for (int i=0; i<Nt; i++) {
+        template[i] += 1;
+        template[i] = (1*blending + template[i]*(1 - blending)) * flux_tune;
+    }
     //fclose(lc_file);
 }
 
@@ -604,7 +628,7 @@ double loglikelihood(double time[], double data[], double noise[],
   double residual;
   double chi2;
   long i;
-	
+
   //allocate memory for light curve
   template = (double *)malloc(N*sizeof(double));
 	
@@ -660,9 +684,9 @@ void set_limits(bounds limited[], bounds limits[])
   limits[3].hi = 1.;
   //limits on inc, in rads
   limited[4].lo = 2;
-  limits[4].lo = -PI/2;
+  limits[4].lo = 0;
   limited[4].hi = 2;
-  limits[4].hi = PI/2;
+  limits[4].hi = PI;
   //limits on Omega, in rads
   limited[5].lo = 2;
   limits[5].lo = -PI;
@@ -692,48 +716,127 @@ void set_limits(bounds limited[], bounds limits[])
     // Limits of the alpha_coefficients
     // limits on limb darkening coefficient for star 1
     limited[10].lo = 1;
-    limits[10].lo = 0.;
+    limits[10].lo = 0.12;
     limited[10].hi = 1.;
-    limits[10].hi = 1.;
+    limits[10].hi = 0.20;
     // limits on gravity darkening coefficient for star 1
     limited[11].lo = 1;
-    limits[11].lo = 0.;
+    limits[11].lo = 0.3;
     limited[11].hi = 1.;
-    limits[11].hi = 1.;
+    limits[11].hi = 0.38;
     // limits on limb darkening coefficient for star 2
     limited[12].lo = 1;
-    limits[12].lo = 0.;
+    limits[12].lo = 0.12;
     limited[12].hi = 1.;
-    limits[12].hi = 1.;
+    limits[12].hi = 0.20;
     // limits on gravity darkening coefficient for star 2
     limited[13].lo = 1;
-    limits[13].lo = 0.;
+    limits[13].lo = 0.3;
     limited[13].hi = 1.;
-    limits[13].hi = 1.;
+    limits[13].hi = 0.38;
     // limits on reflection coefficients on star 1
     limited[14].lo = 1;
-    limits[14].lo = 0.;
+    limits[14].lo = 0.8;
     limited[14].hi = 1.;
-    limits[14].hi = 1.;
-    // limits on extra beaming coefficient for star 1
-    limited[16].lo = 1;
-    limits[16].lo = 0.9;
-    limited[16].hi = 1;
-    limits[16].hi = 1.1;
-    // limits on extra beaming coefficient for star 2
-    limited[17].lo = 1;
-    limits[17].lo = 0.9;
-    limited[17].hi = 1;
-    limits[17].hi = 1.1;
-    // limits on Teff coefficient for star 1
-    limited[18].lo = 1;
-    limits[18].lo = 0.9;
-    limited[18].hi = 1;
-    limits[18].hi = 1.1;
-    // limits on Teff coefficient for star 2
-    limited[19].lo = 1;
-    limits[19].lo = 0.9;
-    limited[19].hi = 1;
-    limits[19].hi = 1.1;
+    limits[14].hi = 1.2;
+    // limits on reflection coefficients on star 2
+    limited[15].lo = 1;
+    limits[15].lo = 0.8;
+    limited[15].hi = 1.;
+    limits[15].hi = 1.2;
+    if (ALPHA_MORE == 1){
+      // limits on extra (log) beaming coefficient for star 1
+      limited[16].lo = 1;
+      limits[16].lo = -0.1;
+      limited[16].hi = 1;
+      limits[16].hi = 0.1;
+      // limits on extra (log) beaming coefficient for star 2
+      limited[17].lo = 1;
+      limits[17].lo = -0.1;
+      limited[17].hi = 1;
+      limits[17].hi = 0.1;
+      // limits on (log) Teff coefficient for star 1
+      limited[18].lo = 1;
+      limits[18].lo = -0.1;
+      limited[18].hi = 1;
+      limits[18].hi = 0.1;
+      // limits on (log) Teff coefficient for star 2
+      limited[19].lo = 1;
+      limits[19].lo = -0.1;
+      limited[19].hi = 1;
+      limits[19].hi = 0.1;
+      if (BLENDING == 1){
+        // Blending coefficient in the flux
+        limited[20].lo = 1;
+        limits[20].lo = 0.;
+        limited[20].hi = 1;
+        limits[20].hi = 1.;
+        // FLux tune coefficient
+        limited[20].lo = 1;
+        limits[20].lo = 0.99;
+        limited[20].hi = 1;
+        limits[20].hi = 1.01;
+      }
+    }
   }
 }
+
+/*
+Function to write the lightcurve in a text file given the list of input parameters
+for three periods
+*/
+void write_lc_to_file(double pars[], char fname[])
+{
+    // Construct the time array
+    const int N = 1000;
+    double period = pow(10., pars[2]);
+    double times[N]; 
+    for (int i=0; i<N; i++)
+    {
+        times[i] = (double)i * (3 * period) / (double) N;
+    }
+
+    double *template = (double *)malloc(N*sizeof(double));
+    calc_light_curve(times, N, pars,template);
+
+    FILE *lcfile = fopen(fname, "w");
+
+    for (int i=0; i<N; i++)
+    {
+        fprintf(lcfile, "%12.5e\t%12.5e\n", times[i], template[i]);
+    }
+
+    fclose(lcfile);
+}
+
+
+/*//Leave commented out unless for debugging purposes
+
+int main()
+{
+    double john_pars[NPARS] = {-0.872961250467939, -1.40912878790312, 0.395192, 0.380400534734164,
+                               1.49943375380441, 1.98966931388, -0.264732952318595, 1818.44300372128,
+                               0.467461878906405, 0.943673457666681, 0.159138696038522,
+                               0.385436121432153, 0.156860600683433, 0.334831704749105,
+                               0.832664900136882, 0.655167012105327, -0.0236897653984011,
+                               0.148295531143382, -0.107481257137963, 0.1464336480184, 
+                               0.603298776112969, 1.00037117832857};
+
+    double siddhant_pars[NPARS] = {-1.12401733053, -0.798865215346, 0.395192, 0.412233604282,
+                                -1.43629596554, 1.98966931388, 2.64545773095, 52.072939571,
+                                 0.529544333685, 0.722604904589,  0.159138696038522,
+                               0.385436121432153, 0.156860600683433, 0.334831704749105,
+                               0.832664900136882, 0.655167012105327, -0.0236897653984011,
+                               0.148295531143382, -0.107481257137963, 0.1464336480184, 
+                               0.603298776112969, 1.00037117832857};
+
+    char *fname1 = "generated_lightcurve.txt";
+    char *fname2 = "generated_lightcurve_john.txt";
+
+    write_lc_to_file(john_pars, fname2);
+    write_lc_to_file(siddhant_pars, fname1);
+
+    return 1;
+    
+}
+*/
