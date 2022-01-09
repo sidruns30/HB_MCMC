@@ -45,6 +45,8 @@ rr2:            Radius scaling factor for star 2
 #else
     #define NPARS 10
 #endif
+#define SAVECOMP 0 // Save the individual lightcurve components in the txt file
+
 
 #define SQR(x) ((x)*(x))
 #define CUBE(x) ((x)*(x)*(x))
@@ -108,12 +110,14 @@ void quickSort(double arr[], int low, int high)
 } 
   
 
-void remove_median(double *arr, long Nt){
+void remove_median(double *arr, long begin, long end){
     // First sort the orignal array
     double *sorted_arr;
-    sorted_arr = (double *)malloc(Nt*sizeof(double));
+    sorted_arr = (double *)malloc((end-begin)*sizeof(double));
 
-    for (int i=0; i<Nt; i++) {sorted_arr[i] = arr[i];}
+    long Nt = end - begin;
+
+    for (int i=0; i<Nt; i++) {sorted_arr[i] = arr[begin + i];}
 
     quickSort(sorted_arr, 0, Nt - 1); 
 
@@ -123,7 +127,7 @@ void remove_median(double *arr, long Nt){
     
     double median = sorted_arr[mid];
 
-    for (int i=0; i<Nt; i++) {arr[i] -= median;}
+    for (int i=0; i<Nt; i++) {arr[begin + i] -= median;}
     free(sorted_arr);
 }
 
@@ -464,10 +468,10 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
         alpha_ref_2 = pars[15];
 	if (ALPHA_MORE ==1){
 	  //extra alphas
-	  extra_alpha_beam_1 = pow(10., pars[16]);//pow(10., pars[16]);
-	  extra_alpha_beam_1 = pow(10., pars[17]);//pow(10., pars[17]);
-	  alpha_Teff_1 = pow(10., pars[18]);//pow(10., pars[18]);
-	  alpha_Teff_2 = pow(10., pars[19]);//pow(10., pars[19]);
+	  extra_alpha_beam_1 = exp(pars[16]);//pow(10., pars[16]);
+	  extra_alpha_beam_1 = exp(pars[17]);//pow(10., pars[17]);
+	  alpha_Teff_1 = exp(pars[18]);//pow(10., pars[18]);
+	  alpha_Teff_2 = exp(pars[19]);//pow(10., pars[19]);
 
         if (BLENDING == 1){
         blending = pars[20];
@@ -589,6 +593,24 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
         // Full lightcurve
         template[i] = (Amag1[i] + Amag2[i]);
 
+        // If individual components are turned on
+        if (SAVECOMP)
+        {
+            if (sizeof(template) < sizeof(5*Nt*sizeof(double)))
+            {
+                printf("template array not allocated enough memory to save all lightcurve components \n");
+                return;
+            }
+
+            template[Nt + i] = Norm1 * beam1 + Norm2 * beam2;
+            template[2*Nt + i] = Norm1 * ellip1 + Norm2 * ellip2;
+            template[3*Nt + i] = Norm1 * ref1 + Norm2 * ref2;
+            template[4*Nt + i] = 0.;
+            
+            if (Z2_arr[i] > Z1_arr[i]) template[4*Nt + i] -= area * Norm2 / (PI * SQR(R2));
+            else if (Z2_arr[i] < Z1_arr[i]) template[4*Nt + i] -= area * Norm1 / (PI * SQR(R1));
+        }
+
         // For writing onto the file
       /*  
         double full_beam, full_ellip, full_ref;
@@ -597,14 +619,47 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
         full_ref = Norm1*ref1 + Norm2*ref2;
         fprintf(lc_file,"%lf\t%lf\t%lf\t%lf\t%lf\n",times[i], template[i], full_beam, full_ellip, full_ref);
         */
-    } 
+    }
+
+    printf("Added individual components, now proceeding to remove the median... \n"); 
 
     // Normalize the lightcurve
-    remove_median(template, Nt);
+    remove_median(template, 0, Nt);
+
     for (int i=0; i<Nt; i++) {
         template[i] += 1;
         template[i] = (1*blending + template[i]*(1 - blending)) * flux_tune;
     }
+
+    // If components are turned on
+    if (SAVECOMP)
+    {
+        if (sizeof(template) < sizeof(5*Nt*sizeof(double)))
+        {
+            printf("template array not allocated enough memory to save all lightcurve components \n");
+            return;
+        }
+
+        printf("Removing median 1 \n");
+        remove_median(template, Nt, 2*Nt);
+        printf("Removing median 2 \n");
+        remove_median(template, 2*Nt, 3*Nt);
+        printf("Removing median 3 \n");
+        remove_median(template, 3*Nt, 4*Nt);
+        printf("Removing median 4 \n");
+        remove_median(template, 4*Nt, 5*Nt);
+
+        printf("Adding the lightcurve components \n");
+        for (int k=1; k<5; k++)
+        {
+            for (int i=0; i<Nt; i++)
+            {
+                template[k*Nt + i] += 1;
+                template[k*Nt + i] = (1*blending + template[k*Nt + i]*(1 - blending)) * flux_tune;
+            }
+        }
+    }
+
     //fclose(lc_file);
 }
 
@@ -796,21 +851,49 @@ void write_lc_to_file(double pars[], char fname[])
         times[i] = (double)i * (3 * period) / (double) N;
     }
 
-    double *template = (double *)malloc(N*sizeof(double));
+    double *template;
+    printf("Allocating memory \n");
+    if (SAVECOMP)
+    {
+        template = (double *)malloc(5*N*sizeof(double));
+        
+    }
+
+    else
+    {
+        template = (double *)malloc(N*sizeof(double));
+    }
+
+    printf("Size of template array is %d \n", sizeof(template));
+
+
+    printf("Allocated memory, calculating lc \n");
+
     calc_light_curve(times, N, pars,template);
+
+    printf("Calculated lc, moving on to saving \n");
 
     FILE *lcfile = fopen(fname, "w");
 
     for (int i=0; i<N; i++)
     {
-        fprintf(lcfile, "%12.5e\t%12.5e\n", times[i], template[i]);
+        if (SAVECOMP)
+        {
+            fprintf(lcfile, "%12.5e\t%12.5e\t%12.5e\t%12.5e\t%12.5e\t%12.5e\n", 
+            times[i], template[i], template[N+i], template[2*N+i], template[3*N+i], template[4*N+i]);
+        }
+
+        else
+        {
+            fprintf(lcfile, "%12.5e\t%12.5e\n", times[i], template[i]);
+        }
     }
 
     fclose(lcfile);
 }
 
-
-/*//Leave commented out unless for debugging purposes
+/*
+//Leave commented out unless for debugging purposes
 
 int main()
 {
@@ -835,6 +918,7 @@ int main()
 
     write_lc_to_file(john_pars, fname2);
     write_lc_to_file(siddhant_pars, fname1);
+
 
     return 1;
     
