@@ -176,7 +176,7 @@ def likelihood(times,fluxes,errs,pars,lctype=3):
       raise ValueError('Unknown light curve model type.')
     noise_resc=np.exp(ln_noise_resc)
     sigmas=errs*noise_resc
-    llike = - np.sum(((fluxes-modelfluxes)/sigmas)**2) - len(errs)*ln_noise_resc # - sum(np.log(2*np.pi*errs**2)) #last term is/would be constant.
+    llike = - np.sum(((fluxes-modelfluxes)/sigmas)**2)/2 - len(errs)*ln_noise_resc # - sum(np.log(2*np.pi*errs**2))/2 #last term is/would be constant.
   except:
     exc_type, exc_value, exc_traceback = sys.exc_info()
     print('likelihood exception:')

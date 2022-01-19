@@ -30,7 +30,7 @@ rr2:            Radius scaling factor for star 2
 #define RSUN 6.955e10
 #define SEC_DAY 86400.0
 #define ALPHA_FREE 1 // to set coefficitents as parameters in the model
-#define ALPHA_MORE 0 // to add even more flexible coefficients
+#define ALPHA_MORE 1 // to add even more flexible coefficients
 #if ALPHA_FREE == 1
   #if ALPHA_MORE == 1
     #define NPARS 20
