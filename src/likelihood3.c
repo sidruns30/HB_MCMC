@@ -477,17 +477,14 @@ radius. Defined by John Baker; parameters tweaked by Siddhant to make the points
 */
 double envelope_Temp(double logM)
 {
-    double m = pow(10., logM);
+    /*The distribution of log10(x/y) ~ N(mu~0, std=0.02264)
+    We assume that y(m) = model(m) x 10 ^ (scale x alpha)
+    log10(x/y) is a normal distribution therefore we want scale x alpha
+    to be a normal distribution. alpha is normally distributed around -1
+    and 1 so we just rescale it by multiplying by the std of log10(x/y)
+    */
 
-    double n=2;
-    double slope=5.8;
-    double floor=0.005;
-    double corner=0.5;
-    double ceil=.0055;
-
-    double boundary = 1/(1/ceil+1/(slope*pow((pow(m, n) + pow(corner, n)), (1/n)) - (slope*corner-floor)));
-
-    return boundary;
+    return 0.0224;
 }
 
 double envelope_Radius(double logM)
