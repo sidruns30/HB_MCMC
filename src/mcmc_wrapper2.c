@@ -8,7 +8,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
-#include <omp.h>
 #include<unistd.h>
 #include "likelihood3.c"
 
@@ -16,7 +15,11 @@
 #define NPAST   500
 #define GAMMA (2.388/sqrt(2.*NPARS))
 #define NUM_ELEMENTS(x) (size_of(x)/size_of(x[0]))
+#define ENABLE_OPENMP 1
 
+#if ENABLE_OPENMP == 1
+  #include <omp.h>
+#endif
 
 /*Change SIGMAP if necessary*/
 double SIGMAP;
@@ -34,12 +37,6 @@ void uniform_proposal(double *x, long *seed, bounds limits[], double *y);
 void gaussian_proposal(double *x, long *seed, double *sigma, double scale, double temp, double *y);
 void hypercube_proposal(double *x, long *seed, double *y);
 void differential_evolution_proposal(double *x, long *seed, double **history, double *y);
-
-// CHeck diff runs
-// Adds John's version
-// Fold on lc
-// Profiler
-
 
 /* Siddhant: Functions to free memory from arrays */
 void free_1d(double *arr){
@@ -64,22 +61,23 @@ void free_3d(double ***arr, int size1, int size2){
 // Function to check if (parameter) file exists
 int exists(const char *fname){
     FILE *file;
-    if ((file = fopen(fname, "r"))){
-        fclose(file);
-        return 1;
+    if (access(fname, R_OK) == 0){
+      return 1;
     }
-    return 0;
+    else {return 0;}
 }
 
 int main(int
  argc, char* argv[])
 {
-  //omp_set_num_threads(1);
+  if (ENABLE_OPENMP)
+  {
+    omp_set_num_threads(50);
+  }
   /* Siddhant: Adding small variable descriptions */
   long Niter;                     // Chain iterations
   double **P_;                    // Contains parameters - check why different from x - seems uneccessary
   double P_0[NPARS];            
-  double *y;                      // Updated Parameter
   double **x;                     // Parameter chains
   double ***history;              // Chain history
   double xmap[NPARS];           // Contains the chain with best paramters
@@ -90,12 +88,10 @@ int main(int
   double logLmap;                 
   double logLy;                   // Likelihood for new step
   double tmp,tmp1,tmp2,tmp3,tmp4;
-  //double Tmin;                    // Never used!
-  //double t_range[2];              // Never used!
   double true_err,Nerr,suberr;    // True error contains error on each LC point; others not used
   double scale;                   
   double dtemp;                   // Ask Jeremy
-  double heat[NCHAINS],temp[NCHAINS]; // More PTMCMC stuff - heat never used
+  double heat[NCHAINS],temp[NCHAINS]; // More PTMCMC stuff
   double H;                       // Hasting's ratio
   double *rdata;                  
   double *a_data,*a_model,*e_data,*t_data,*q_data;
@@ -123,6 +119,7 @@ int main(int
   true_err = (double)atof(argv[3]);
   burn_in = atoi(argv[4]);
   ls_period = (double)atof(argv[5]);
+  int run = atoi(argv[6]);
 
   // Set period search
   if (burn_in == 2) {SIGMAP = 1.e-10;}
@@ -145,7 +142,21 @@ int main(int
   strcat(outname,".out");
   printf("%s\n",parname);
 
-  /*Use binned period if period is found, otherwise use the full lightcurve*/
+  char suffix[30];
+  sprintf(suffix, "%d", run);
+  strcat(subparname, suffix);
+  strcat(parname, suffix);
+  strcat(chainname, suffix);
+  strcat(logLname, suffix);
+  strcat(outname, suffix);
+
+  printf("%s\n", subparname);
+  printf("%s\n", parname);
+  printf("%s\n", chainname);
+  printf("%s\n", logLname);
+  printf("%s\n", outname);
+
+  /*Use binned lc if period is found, otherwise use the full lightcurve*/
   if (burn_in == 2){
   strcpy(dfname,"../data/lightcurves/folded_lightcurves/");
   strcat(dfname,RUN_ID);
@@ -170,7 +181,6 @@ int main(int
     for(j=0;j<NPAST;j++)history[i][j]=(double *)malloc(NPARS*sizeof(double));
   }
 
-  y = (double *)malloc(NPARS*sizeof(double));
   sigma = (double *)malloc(NPARS*sizeof(double));
   scale  = 1.0/((double)(NPARS));
   //
@@ -197,6 +207,7 @@ int main(int
       }
   
     else {
+
       tmp = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
       printf("\t assinging random pars \n");
       }
@@ -209,7 +220,7 @@ int main(int
       P_[j][i] = P_[0][i];
       x[j][i]  = P_[0][i];
     }
-
+    // burn_in == 1 seems redundant?
     if (burn_in == 1) {
       for(j=0; j<NCHAINS; j++) {
         if (param_file_flag != 1){
@@ -225,7 +236,6 @@ int main(int
         if (param_file_flag != 1){
           P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
           if (i == 2) P_[j][i] = ls_period;  // Keep the period
-          if (i == 7) P_[j][i] = 0;          // Set T0 = 0
           x[j][i]  = P_[j][i];
         }
       }
@@ -233,8 +243,6 @@ int main(int
   }
 
   if (burn_in == 1){
-      printf("Test6 \n");
-      printf("Dfname:");
       //printf("%s", dfname);
     if (exists(parname)){fclose(param_file);}
     /* Read binned data file */
@@ -246,7 +254,6 @@ int main(int
     rdata        = (double *)malloc(4*Nt*sizeof(double));
     index        = (int *)malloc(NCHAINS*sizeof(int));
 
-    printf("Test7 \n");
     for (i=0;i<Nt;i++) {
       fscanf(data_file,"%lf %lf %lf %lf\n", &tmp1, &tmp2, &tmp3, &tmp4);
       rdata[i*4]=tmp1;
@@ -353,8 +360,11 @@ int main(int
   for (iter=0; iter<Niter; iter++) {
     if(iter % 10 == 0) {begin = clock();}
     //loop over chains
-    //#pragma omp for schedule(static)
+    if (ENABLE_OPENMP){
+    #pragma omp parallel for //schedule(static) shared(history, logLx, x)
+    }1
     for(j=0; j<NCHAINS; j++) {
+      double *y = (double *)malloc(NPARS*sizeof(double));
       alpha = ran2(&seed);  
       jscale = pow(10.,-6.+6.*alpha);
       /* propose new solution */
@@ -414,6 +424,8 @@ int main(int
       /*  fill history  */
       k = iter - (iter/NPAST)*NPAST;
       for(i=0; i<NPARS; i++) history[j][k][i] = x[index[j]][i];
+      free_1d(y);
+      //#pragma omp barrier
     }
     /********Chain Loop ends**********/
     // Call timer after 10 iterations
@@ -450,6 +462,7 @@ int main(int
 	    (double)(acc)/((double)atrial),
 	    (double)DEacc/(double)DEtrial);
 	    printf("\n");
+      printf("Npars = %d \n", NPARS);
       }
     atrial++;
     
@@ -463,15 +476,12 @@ int main(int
 	      fprintf(data_file,"%12.5e %12.5e %12.5e\n",t_data[i],a_data[i],a_model[i]);
       }
       fclose(data_file);  
+      
       param_file = fopen(subparname,"w");
-      fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e\n",
-	    x[index[0]][0],x[index[0]][1],x[index[0]][2],x[index[0]][3],x[index[0]][4]);
-      fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
-	    x[index[0]][5],x[index[0]][6],x[index[0]][7],x[index[0]][8],x[index[0]][9],x[index[0]][10]);
-      if (ALPHA_FREE == 1){
-         fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e\n",
-	       x[index[0]][11],x[index[0]][12],x[index[0]][13],x[index[0]][14],x[index[0]][15]);
+      for (int z=0; z<NPARS; z++){
+        fprintf(param_file, "%12.5e ", x[index[0]][z]);
       }
+      fprintf(param_file,"\n");
       fclose(param_file);
     }
     
@@ -486,21 +496,16 @@ int main(int
   }
   fclose(data_file);  
   param_file = fopen(parname,"w");
-  fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e\n",
-	x[index[0]][0],x[index[0]][1],x[index[0]][2],x[index[0]][3],x[index[0]][4]);
-  fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
-	x[index[0]][5],x[index[0]][6],x[index[0]][7],x[index[0]][8],x[index[0]][9],x[index[0]][10]);
-  if (ALPHA_FREE == 1){
-    fprintf(param_file,"%12.5e %12.5e %12.5e %12.5e %12.5e\n",
-	  x[index[0]][11],x[index[0]][12],x[index[0]][13],x[index[0]][14],x[index[0]][15]);
+  for (int z=0; z<NPARS; z++){
+    fprintf(param_file, "%12.5e ", x[index[0]][z]);
   }
+  fprintf(param_file,"\n");
   fclose(param_file);
 
   // Free the memory from arrays
   free_2d(P_, NCHAINS);
   free_2d(x, NCHAINS);
   free_3d(history, NCHAINS, NPAST);
-  free_1d(y);
   free_1d(sigma);
   free_1d(rdata);
   free(index);

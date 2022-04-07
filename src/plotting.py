@@ -59,7 +59,7 @@ try:
     #plt.gcf().text(0.2, 0.78, some_string[:140], fontsize=8, color='lime')
     #plt.gcf().text(0.25, 0.73, some_string[140:], fontsize=8, color='lime')
     plt.plot(time, lc, 'r.', linewidth=0.5, label="Real Lightcurve")
-    plt.plot(time, model, 'x-', color='yellow', linewidth=1, label="Computed lightcurve")
+    plt.plot(time, model, '.-', color='yellow', linewidth=1, label="Computed lightcurve")
     plt.xlabel("Time", fontsize=15, family="serif")
     plt.ylabel("Flux", fontsize=15, family="serif")
     #plt.xlim((2225, 2255))
