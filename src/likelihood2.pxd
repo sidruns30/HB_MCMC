@@ -1,3 +1,4 @@
+# distutils: language=c
 # distutils: extra_compile_args = -O3 -std=c99
 
 cdef extern from "likelihood2.c":

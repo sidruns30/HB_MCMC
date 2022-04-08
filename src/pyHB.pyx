@@ -4,12 +4,13 @@ cimport cython
 #cdef void calc_light_curve(double* times, double Nt, double*pars, double *template);
 import numpy as np
 
-cimport likelihood2
+#cimport likelihood2
 cimport likelihood3
 import sys
 import traceback
 
-def lightcurve2(times,inpars):
+'''
+cpdef lightcurve2(times,inpars):
   logM1, logM2, logP_day, e, inc, omega, omega0, T0_day,log_rad1_rescale,log_rad2_rescale,logTanom,blend_frac,logFluxTESS=inpars
   cdef double pars[12]
   #need to convert angles from rad to deg here
@@ -25,14 +26,14 @@ def lightcurve2(times,inpars):
   #return template+10**(log_blendFlux+logFluxTESS)
   Flux_TESS = 10.**logFluxTESS
   return 1*blend_frac + template*(1-blend_frac)
+'''
 
-
-def lightcurve3(times,inpars):
+cpdef lightcurve3(times,inpars):
   logM1, logM2, logP_day, e, inc, omega0, T0_day, log_rad1_rescale, log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, ln_beam_resc_1, ln_beam_resc_2, ln_alp_Teff_1, ln_alp_Teff_2, blend_frac, flux_tune=inpars
-  cdef double pars[20]
+  cdef double pars[22]
   #need to convert angles from rad to deg here
   radeg=180/np.pi
-  pars[:]=[  logM1, logM2, logP_day, e, inc, 0, omega0, T0_day, log_rad1_rescale,log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, np.exp(ln_beam_resc_1), np.exp(ln_beam_resc_2), np.exp(ln_alp_Teff_1), np.exp(ln_alp_Teff_2) ]
+  pars[:]=[  logM1, logM2, logP_day, e, inc, 0, omega0, T0_day, log_rad1_rescale,log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, np.exp(ln_beam_resc_1), np.exp(ln_beam_resc_2), np.exp(ln_alp_Teff_1), np.exp(ln_alp_Teff_2), blend_frac, flux_tune]
   times=np.array(times)
   cdef int Nt=len(times)
   cdef double[:] ctimes = times
@@ -64,7 +65,24 @@ def lightcurve3(times,inpars):
   '''
   likelihood3.calc_light_curve(&ctimes[0],Nt,&pars[0],&ctemplate[0]);
   template=np.array(ctemplate)
-  return ( 1*blend_frac + template*(1-blend_frac) ) * flux_tune
+  #return ( 1*blend_frac + template*(1-blend_frac) ) * flux_tune
+  return template  #blend_frac and flux_tune now in template
+
+cpdef calc_radii_and_Teffs(params):
+  '''
+  Returns R1(Rsun),R2(Rsun),Teff1(K),Teff2(K)
+  '''
+  logM1, logM2, logP_day, e, inc, omega0, T0_day, log_rad1_rescale, log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, ln_beam_resc_1, ln_beam_resc_2, ln_alp_Teff_1, ln_alp_Teff_2, blend_frac, flux_tune=params
+  cdef double cpars[22]
+  cdef double R1,R2,Teff1,Teff2;
+  #no need to convert angles from rad to deg here (because not used)
+  #radeg=180/np.pi
+  cpars[:]=[  logM1, logM2, logP_day, e, inc, 0, omega0, T0_day, log_rad1_rescale,log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, np.exp(ln_beam_resc_1), np.exp(ln_beam_resc_2), np.exp(ln_alp_Teff_1), np.exp(ln_alp_Teff_2), blend_frac, flux_tune]
+  R1=0;R2=0;Teff1=0;Teff2=0;
+
+  likelihood3.calc_radii_and_Teffs(&cpars[0],&R1,&R2,&Teff1,&Teff2)
+  return R1,R2,Teff2,Teff2
+
 
 class parspace:
   def __init__(self, *args):
@@ -146,8 +164,8 @@ sp3=parspace(
   'inc', [ 0, np.pi ],
   'omega0', [ -np.pi, np.pi ],
   'T0', [ -1000, 1000 ],
-  'log_rad1_resc', [ -2, 2 ],
-  'log_rad2_resc', [ -2, 2 ],
+  'alp_rad1_resc', [ -1, 1 ],
+  'alp_rad2_resc', [ -1, 1 ],
   'mu_1', [ 0.12, 0.20 ],
   'tau_1', [ 0.30, 0.38 ],
   'mu_2', [ 0.12, 0.20 ],
@@ -156,8 +174,8 @@ sp3=parspace(
   'alpha_ref_2', [0.8,1.2],
   'ln_beam_resc_1', [-0.1,0.1],
   'ln_beam_resc_2', [-0.1,0.1],
-  'ln_alp_Teff_1', [-0.1,0.1],
-  'ln_alp_Teff_2', [-0.1,0.1],
+  'alp_Teff_1', [-1,1],
+  'alp_Teff_2', [-1,1],
   'blend_frac', [ 0.0, 1.0 ],
   'flux_tune', [ 0.99, 1.01 ],
   'ln_noise_resc', [ -0.2, 0.2 ]
@@ -169,7 +187,8 @@ def likelihood(times,fluxes,errs,pars,lctype=3):
   pars=pars[:-1]
   try:
     if lctype==2:
-      modelfluxes=lightcurve2(times, pars)
+      raise ValueError("lctype=2 no longer supported")
+      #modelfluxes=lightcurve2(times, pars)
     elif lctype==3:
       modelfluxes=lightcurve3(times, pars)
     else:
@@ -186,6 +205,8 @@ def likelihood(times,fluxes,errs,pars,lctype=3):
   #print(llike)
   return llike
 
+    
+
 def test_roche_lobe(pars,verbose=False):
     logM1=pars[0]
     logM2=pars[1]
@@ -198,11 +219,7 @@ def test_roche_lobe(pars,verbose=False):
     logRadResc2=pars[10]
     Rcoeff = [0.00158766,0.921233,-0.155659,-0.0739842,0.0581150]
     R1=R2=0
-    for j in range(len(Rcoeff)):
-      R1 += Rcoeff[j]*pow(logM1,j)
-      R2 += Rcoeff[j]*pow(logM2,j)
-    R1=10**(R1+logRadResc1)
-    R2=10**(R2+logRadResc2)
+    R1,R2,Teff1,Teff2=calc_radii_and_Teffs(pars[:-1])
     if q<=1:
       Rsec=R2
       Rpri=R1
