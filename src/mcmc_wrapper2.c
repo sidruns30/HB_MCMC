@@ -9,8 +9,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include<unistd.h>
-#include "likelihood3.c"
+#include "likelihood3.h"
 
+#define SQRT_2PI 2.5066282746
 #define NCHAINS 50
 #define NPAST   500
 #define GAMMA (2.388/sqrt(2.*NPARS))
@@ -21,12 +22,8 @@
   #include <omp.h>
 #endif
 
-/*Change SIGMAP if necessary*/
-double SIGMAP;
-
 /* From likelihood.c */
 void calc_light_curve(double t_data[], long Nt, double P_[], double light_curve[]);
-double likelihood(double t_data[], double a_data[], double e_data[], long Nt, double P_[]);
 /* Siddhant: What are ran2 and gasdev2 */ 
 void ptmcmc(int *index, double heat[], double logL[]);
 double ran2(long *idum);
@@ -37,6 +34,14 @@ void uniform_proposal(double *x, long *seed, bounds limits[], double *y);
 void gaussian_proposal(double *x, long *seed, double *sigma, double scale, double temp, double *y);
 void hypercube_proposal(double *x, long *seed, double *y);
 void differential_evolution_proposal(double *x, long *seed, double **history, double *y);
+
+
+// CHeck diff runs
+// Adds John's version
+// Fold on lc
+// Profiler
+
+double SIGMAP, SIGMA_BLEND;
 
 /* Siddhant: Functions to free memory from arrays */
 void free_1d(double *arr){
@@ -67,13 +72,182 @@ int exists(const char *fname){
     else {return 0;}
 }
 
+
+/* Set priors on parameters, and whether or not each parameter is bounded*/
+/* Siddhant: Maybe just use an if condition/switch statment instead of limited*/
+void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[])
+{
+  //limits on M1, in log10 MSUN
+  limited[0].lo = 1; 
+  limits[0].lo = -1.5;
+  limited[0].hi = 1;
+  limits[0].hi = 2.0;
+  gauss_pars[0].flag = 0;
+  //limits on M2, in log10 MSUN
+  limited[1].lo = 1;
+  limits[1].lo = -1.5;
+  limited[1].hi = 1;
+  limits[1].hi = 2.0;
+  gauss_pars[1].flag = 0;
+  //limits on P, in log10 days
+  limited[2].lo = 1;
+  limits[2].lo = -2.0;
+  limited[2].hi = 1;
+  limits[2].hi = 3.0;
+  gauss_pars[2].flag = 0;
+  //limits on e
+  limited[3].lo = 1;
+  limits[3].lo = 0.0;
+  limited[3].hi = 1;
+  limits[3].hi = 1;
+  gauss_pars[3].flag = 0;
+  //limits on inc, in rads
+  limited[4].lo = 2;
+  limits[4].lo = 0;
+  limited[4].hi = 2;
+  limits[4].hi = PI/2;
+  gauss_pars[4].flag = 0;
+  //limits on Omega, in rads
+  limited[5].lo = 2;
+  limits[5].lo = -PI;
+  limited[5].hi = 2;
+  limits[5].hi = PI;
+  gauss_pars[5].flag = 0;
+  //limits on omega0, in rads
+  limited[6].lo = 2;
+  limits[6].lo = -PI;
+  limited[6].hi = 2;
+  limits[6].hi = PI;
+  gauss_pars[6].flag = 0;
+  //limits on T0, in MDJ-2450000
+  limited[7].lo = 1;
+  limits[7].lo = -1000;
+  limited[7].hi = 1;
+  limits[7].hi = 1000.;
+  gauss_pars[7].flag = 0;
+  //limits on log rr1, the scale factor for R1
+  limited[8].lo = 1;
+  limits[8].lo = -3.;
+  limited[8].hi = 1;
+  limits[8].hi = 3.;
+  gauss_pars[8].flag = 1.;
+  //limits on log rr2, the scale factor for R2
+  limited[9].lo = 1;
+  limits[9].lo = -3.;
+  limited[9].hi = 1;
+  limits[9].hi = 3.;
+  gauss_pars[9].flag = 1.;
+  if (ALPHA_FREE == 1){
+    // Limits of the alpha_coefficients
+    // limits on limb darkening coefficient for star 1
+    limited[10].lo = 1;
+    limits[10].lo = 0.12;
+    limited[10].hi = 1;
+    limits[10].hi = 0.20;
+    gauss_pars[10].flag = 1;
+    // limits on gravity darkening coefficient for star 1
+    limited[11].lo = 1;
+    limits[11].lo = 0.3;
+    limited[11].hi = 1;
+    limits[11].hi = 0.38;
+    gauss_pars[11].flag = 1;
+    // limits on limb darkening coefficient for star 2
+    limited[12].lo = 1;
+    limits[12].lo = 0.12;
+    limited[12].hi = 1;
+    limits[12].hi = 0.20;
+    gauss_pars[12].flag = 1;
+    // limits on gravity darkening coefficient for star 2
+    limited[13].lo = 1;
+    limits[13].lo = 0.3;
+    limited[13].hi = 1;
+    limits[13].hi = 0.38;
+    gauss_pars[13].flag = 1;
+    // limits on reflection coefficients on star 1
+    limited[14].lo = 1;
+    limits[14].lo = 0.8;
+    limited[14].hi = 1;
+    limits[14].hi = 1.2;
+    gauss_pars[14].flag = 1;
+    // limits on reflection coefficients on star 2
+    limited[15].lo = 1;
+    limits[15].lo = 0.8;
+    limited[15].hi = 1;
+    limits[15].hi = 1.2;
+    gauss_pars[15].flag = 1;
+    if (ALPHA_MORE == 1){
+      // limits on extra (log) beaming coefficient for star 1
+      limited[16].lo = 1;
+      limits[16].lo = -0.1;
+      limited[16].hi = 1;
+      limits[16].hi = 0.1;
+      gauss_pars[16].flag = 1;
+      // limits on extra (log) beaming coefficient for star 2
+      limited[17].lo = 1;
+      limits[17].lo = -0.1;
+      limited[17].hi = 1;
+      limits[17].hi = 0.1;
+      gauss_pars[17].flag = 1;
+      // limits on Teff coefficient for star 1
+      limited[18].lo = 1;
+      limits[18].lo = -3.;
+      limited[18].hi = 1;
+      limits[18].hi = 3.;
+      gauss_pars[18].flag = 1.;
+      // limits on Teff coefficient for star 2
+      limited[19].lo = 1;
+      limits[19].lo = -3.;
+      limited[19].hi = 1;
+      limits[19].hi = 3.;
+      gauss_pars[19].flag = 1.;
+      if (BLENDING == 1){
+        // Blending coefficient in the flux
+        limited[20].lo = 1;
+        limits[20].lo = 0.;
+        limited[20].hi = 1;
+        limits[20].hi = 1.;
+        gauss_pars[20].flag = 0;
+        // FLux tune coefficient
+        limited[21].lo = 1;
+        limits[21].lo = 0.99;
+        limited[21].hi = 1;
+        limits[21].hi = 1.01;
+        gauss_pars[21].flag = 0;
+      }
+    }
+  }
+}
+
+// Standard gaussian
+double gaussian(double x, double mean, double sigma)
+{
+  return (1 / sigma / SQRT_2PI) * exp(- pow((x - mean) / sigma, 2.));
+}
+
+// Get the log priors over all priors
+double get_logP(double pars[], bounds limited[], bounds limits[], gauss_bounds gauss_pars[])
+{
+  double logP = 0.;
+  double mean;
+  double sigma;
+  for (int i=0; i<NPARS; i++)
+  {
+    if (gauss_pars[i].flag == 1)
+    {
+      mean = 0.5 * (limits[i].lo + limits[i].hi);
+      sigma = (limits[i].hi - limits[i].lo) / 2.;
+      logP += log10(gaussian(pars[i], mean, sigma));
+    }
+  }
+  return logP;
+}
+
+
+
 int main(int
  argc, char* argv[])
 {
-  if (ENABLE_OPENMP)
-  {
-    omp_set_num_threads(50);
-  }
+
   /* Siddhant: Adding small variable descriptions */
   long Niter;                     // Chain iterations
   double **P_;                    // Contains parameters - check why different from x - seems uneccessary
@@ -83,7 +257,6 @@ int main(int
   double xmap[NPARS];           // Contains the chain with best paramters
   double dx[NPARS];             // Parameter step
   double dx_mag;                  
-  double alpha;                   // Random number stuff
   double logLx[NCHAINS];          // Log likelihood for all chains
   double logLmap;                 
   double logLy;                   // Likelihood for new step
@@ -92,25 +265,29 @@ int main(int
   double scale;                   
   double dtemp;                   // Ask Jeremy
   double heat[NCHAINS],temp[NCHAINS]; // More PTMCMC stuff
-  double H;                       // Hasting's ratio
   double *rdata;                  
   double *a_data,*a_model,*e_data,*t_data,*q_data;
+  double *mag_data, *mag_err;
   double *light_curve;            
-  double *light_curve2;           
+  double *light_curve2;
+  double blending;        
   long i,j,k,m,subi;              
   long Nt,Nstart,Nstop,subN,obs_id,nch;
   long acc;                       
   long iter,TICid;                
   int *index, burn_in;
+  int run;
+  int nthreads;
   double ls_period;  
-  double SIGMAP;        
+  //double SIGMAP;        
 
   bounds limited[NPARS], limits[NPARS];
-  FILE *param_file, *data_file, *chain_file, *logL_file;
+  gauss_bounds gauss_pars[NPARS];
+  FILE *param_file, *data_file, *chain_file, *logL_file, *mag_file;
   /* Siddhant: Initializing empty arrays help avoid memory leaks*/
   char  pfname[80]="", dfname[80]="",  parname[80]="",
         subparname[80]="",  outname[80]="", chainname[80]="",
-        logLname[80]="", RUN_ID[11]="";
+        logLname[80]="", RUN_ID[11]="", mag_name[80]="";
   //characteristic magnitude of MCMC step in each parameter
   double  *sigma;
 
@@ -119,11 +296,23 @@ int main(int
   true_err = (double)atof(argv[3]);
   burn_in = atoi(argv[4]);
   ls_period = (double)atof(argv[5]);
-  int run = atoi(argv[6]);
+  run = atoi(argv[6]);
+  blending = (double)atof(argv[7]);
+  nthreads = (long)atoi(argv[8]);
 
+  if (ENABLE_OPENMP)
+  {
+    omp_set_num_threads(nthreads);
+  }
+  //double weight = (double)atof(argv[7]);
   // Set period search
-  if (burn_in == 2) {SIGMAP = 1.e-10;}
-  else              {SIGMAP = 1.e-1;}
+  if (burn_in == 2) 
+  {
+    SIGMAP = 1.e-10;
+  }
+  else              {
+    SIGMAP = 1.e-1;
+    }
 
   strcat(subparname,"../data/subpars/subpar.");
   strcat(subparname,RUN_ID);
@@ -140,8 +329,12 @@ int main(int
   strcat(outname,"../data/lightcurves/mcmc_lightcurves/");
   strcat(outname,RUN_ID);
   strcat(outname,".out");
+  strcpy(mag_name,"../data/magnitudes/");
+  strcat(mag_name,RUN_ID);
+  strcat(mag_name,".txt");
   printf("%s\n",parname);
 
+  //double weight = (double)atof(argv[7]);
   char suffix[30];
   sprintf(suffix, "%d", run);
   strcat(subparname, suffix);
@@ -174,6 +367,9 @@ int main(int
   
   x = (double **)malloc(NCHAINS*sizeof(double));
   for(i=0;i<NCHAINS;i++) x[i]=(double *)malloc(NPARS*sizeof(double));
+
+
+  //y = (double *)malloc(NPARS*sizeof(double));
   
   history = (double ***)malloc(NCHAINS*sizeof(double));
   for(i=0;i<NCHAINS;i++) {
@@ -187,16 +383,24 @@ int main(int
 
   //true_err = 1.0;
   srand(Niter);
-  long seed = Niter;
+  long seed = run;
+  long chain_seeds[NCHAINS];
+
+  for (int i=0; i<NCHAINS; i++)
+  {
+    chain_seeds[i] = run + i;
+  }
+
   //read in starting parameters near best solution
   printf("Opening parameter file \n");
   if (exists(parname)){param_file = fopen(parname,"r");}
   printf("Parameter file: %s\n",parname);
   //initialize priors
-  set_limits(limited,limits);
+  set_limits(limited,limits, gauss_pars);
   //set up proposal distribution
   initialize_proposals(sigma, history);
-  
+  sigma[2] = SIGMAP;
+
   int param_file_flag = 0;
   /* Siddhant: Initializing the chain parameters*/
   for (i=0;i<NPARS;i++) {
@@ -233,11 +437,12 @@ int main(int
 
     if (burn_in == 2) {
       for(j=0; j<NCHAINS; j++) {
-        if (param_file_flag != 1){
+        //if (param_file_flag != 1){
           P_[j][i] = limits[i].lo + ran2(&seed)*(limits[i].hi - limits[i].lo);
           if (i == 2) P_[j][i] = ls_period;  // Keep the period
+          if (i == 20) P_[j][i] = blending;
           x[j][i]  = P_[j][i];
-        }
+        // }
       }
     }
   }
@@ -272,6 +477,8 @@ int main(int
     q_data       = (double *)malloc(subN*sizeof(double));
     light_curve  = (double *)malloc(subN*sizeof(double));
     light_curve2 = (double *)malloc(subN*sizeof(double));
+    mag_data     = (double *)malloc(5*sizeof(double));
+    mag_err     = (double *)malloc(4*sizeof(double));
     
     subi = 0;
     for (i=0;i<Nt;i++) {
@@ -282,7 +489,18 @@ int main(int
       e_data[subi] = sqrt(rdata[i*4+1])*true_err;
       subi++;
       }
-  }      
+  }
+    printf("Opening magnitude file");
+    mag_file = fopen(mag_name, "r");
+    double tmp1, tmp2;
+    fscanf(mag_file, "%lf\n", &tmp1);
+    mag_data[0] = tmp1;
+    for (i=0;i<4;i++){
+      fscanf(mag_file, "%lf\t%lf\n", &tmp1, &tmp2);
+      mag_data[i+1] = tmp1;
+      mag_err[i] = tmp2;
+    }
+    fclose(mag_file);      
   }
 
   else if (burn_in == 2){
@@ -314,18 +532,32 @@ int main(int
     q_data       = (double *)malloc(subN*sizeof(double));
     light_curve  = (double *)malloc(subN*sizeof(double));
     light_curve2 = (double *)malloc(subN*sizeof(double));
+    mag_data     = (double *)malloc(5*sizeof(double));
+    mag_err     = (double *)malloc(4*sizeof(double));
     
     for (subi=0;subi<Nt;subi++) {
       t_data[subi] = rdata[subi*3]; 
       a_data[subi] = rdata[subi*3+1]; 
       e_data[subi] = rdata[subi*3+2];
   }
+
+    printf("Opening magnitude file");
+    mag_file = fopen(mag_name, "r");
+    double tmp1, tmp2;
+    fscanf(mag_file, "%lf\n", &tmp1);
+    mag_data[0] = tmp1;
+    for (i=0;i<4;i++){
+      fscanf(mag_file, "%lf\t%lf\n", &tmp1, &tmp2);
+      mag_data[i+1] = tmp1;
+      mag_err[i] = tmp2;
+    }   
+  fclose(mag_file); 
   }
 
 
 	
   // initialize parallel tempering
-  /* Siddhant: what is dtemp and why is it set to an arbitrary value like this */
+  /* Siddhant: why is it set to an arbitrary value like this */
   dtemp = 1.2;
   if (burn_in >= 1) dtemp = 1.3;
   
@@ -338,54 +570,67 @@ int main(int
   }
 
   //initialize likelihood
-  logLmap = loglikelihood(t_data,a_data,e_data,subN,P_[0]);
+  // read the likelihood from file
+  //char *test_fname = "../debug/input_tests.txt";
+  //FILE *outfile = fopen(test_fname, "r");
+  //double tst_db;
+  //for (int i=0; i<NPARS; i++)
+  //{
+    //fscanf(outfile, "\t%lf", &tst_db);
+    //P_[0][i] = tst_db;
+  //}
 
-  printf("initial chi2 %g\n",-2*logLmap);
- 
-  //for(i=0; i<NCHAINS; i++) logLx[i] = logLmap;
+  //fclose(outfile);
+  //TEST_lc_calc(P_[0]);
+
+  logLmap = loglikelihood(t_data,a_data,e_data,subN,P_[0], mag_data, mag_err, 0);
+
+  printf("initial chi2 and likelihood %g \t %g\n",-2*logLmap, logLmap);
+
+  for(i=0; i<NCHAINS; i++) logLx[i] = logLmap;
 
   acc=0;
   printf("Creating chain and log files \n");
   chain_file = fopen(chainname,"w");
   logL_file  = fopen(logLname,"w");
 
+  
   int atrial=0;
   int DEtrial=0;
   int DEacc=0;
-  int jump;
-  double jscale;
   
   clock_t begin, end;
   /* Main MCMC Loop*/
   for (iter=0; iter<Niter; iter++) {
     if(iter % 10 == 0) {begin = clock();}
     //loop over chains
-    if (ENABLE_OPENMP){
-    #pragma omp parallel for //schedule(static) shared(history, logLx, x)
-    }1
+    #pragma omp parallel for schedule(static)
     for(j=0; j<NCHAINS; j++) {
+      int jump;
+
       double *y = (double *)malloc(NPARS*sizeof(double));
-      alpha = ran2(&seed);  
-      jscale = pow(10.,-6.+6.*alpha);
+      double alpha = ran2(&chain_seeds[j]);  
+      double jscale = pow(10.,-6.+6.*alpha);
       /* propose new solution */
       jump=0;
       /* DE proposal; happens after 500 cycles */
-      if(ran2(&seed)<0.5 && iter>NPAST) {jump=1;}
+      if(ran2(&chain_seeds[j])<0.5 && iter>NPAST) {jump=1;}
       //gaussian jumps along parameter directions
-      if(jump==0){gaussian_proposal(x[index[j]], &seed, sigma, jscale, temp[j], y);}
+      if(jump==0){gaussian_proposal(x[index[j]], &chain_seeds[j], sigma, jscale, temp[j], y);}
       //jump along correlations derived from chain history
       if(jump==1) {
 	      if(index[j]==0)DEtrial++;
-	      differential_evolution_proposal(x[index[j]], &seed, history[j], y);
+	      differential_evolution_proposal(x[index[j]], &chain_seeds[j], history[j], y);
 	      dx_mag=0;
 	        for (i=0;i<NPARS;i++) {
 	          dx_mag+=(x[index[j]][i]-y[i])*(x[index[j]][i]-y[i]);
 	        }
 	      if (dx_mag < 1e-6)
-	        gaussian_proposal(x[index[j]], &seed, sigma, jscale, temp[j], y);
+	        gaussian_proposal(x[index[j]], &chain_seeds[j], sigma, jscale, temp[j], y);
       }
 
       for (i=0;i<NPARS;i++) {
+
 	      //enforce priors (reflecting boundary conditions)
 	      if ((limited[i].lo == 1)&&(y[i] < limits[i].lo))
 	        y[i] = 2.0*limits[i].lo - y[i];
@@ -396,17 +641,35 @@ int main(int
 	        y[i] = limits[i].hi + (y[i]-limits[i].lo);
 	      if ((limited[i].hi == 2)&&(y[i] > limits[i].hi)) 
 	        y[i] = limits[i].lo + (y[i]-limits[i].hi);
+
+        // Enforce limits on x too
+	      //enforce priors (reflecting boundary conditions)
+	      if ((limited[i].lo == 1)&&(x[index[j]][i] < limits[i].lo))
+	        x[index[j]][i] = 2.0*limits[i].lo - x[index[j]][i];
+	      if ((limited[i].hi == 1)&&(x[index[j]][i] > limits[i].hi)) 
+	        x[index[j]][i] = 2.0*limits[i].hi - x[index[j]][i];
+	      //enforce priors (periodic boundary conditions)
+	      if ((limited[i].lo == 2)&&(x[index[j]][i] < limits[i].lo)) 
+	        x[index[j]][i] = limits[i].hi + (x[index[j]][i]-limits[i].lo);
+	      if ((limited[i].hi == 2)&&(x[index[j]][i] > limits[i].hi)) 
+	        x[index[j]][i] = limits[i].lo + (x[index[j]][i]-limits[i].hi);
+        
       }
+      // Gaussian log priors
+      double logPx, logPy;
+
+      logPx = get_logP(x[index[j]], limited, limits, gauss_pars);
+      logPy = get_logP(y, limited, limits, gauss_pars);
 
       //compute trial signal
-      logLx[index[j]] = loglikelihood(t_data,a_data,e_data,subN,x[index[j]]);
-      logLy = loglikelihood(t_data,a_data,e_data,subN,y);
-      
+      logLx[index[j]] = loglikelihood(t_data,a_data,e_data,subN,x[index[j]], mag_data, mag_err, 0);
+      logLy = loglikelihood(t_data,a_data,e_data,subN,y, mag_data, mag_err, 0);
+
       /* evaluate new solution */
       //Hasting's ratio
-      H = exp( (logLy-logLx[index[j]])/temp[j] );
+      double H = exp( (logLy-logLx[index[j]])/temp[j] ) * pow(10., logPy - logPx);
       //acceptance probability
-      alpha = ran2(&seed);
+      alpha = ran2(&chain_seeds[j]);
       //printf("Log(Ly), Log(Lx): %12.5e %12.5e\n", logLy,logLx[index[j]]);
       //conditional acceptance of y
       if (alpha <= H) {
@@ -419,22 +682,17 @@ int main(int
       }
 
       /* parallel tempering */
+      #pragma omp critical
       ptmcmc(index,temp,logLx);
 
       /*  fill history  */
       k = iter - (iter/NPAST)*NPAST;
       for(i=0; i<NPARS; i++) history[j][k][i] = x[index[j]][i];
-      free_1d(y);
+
+      free_1d(y); 
       //#pragma omp barrier
     }
     /********Chain Loop ends**********/
-    // Call timer after 10 iterations
-    //if (iter%10 == 9){
-    //  end = clock();
-    //  double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    //  printf("time spent in the last 10 iterations: %f \n", time_spent);
-    //  }
-
     //update map parameters
     if (logLx[index[0]] > logLmap) {
       for (i=0;i<NPARS;i++) {
@@ -516,6 +774,7 @@ int main(int
   free_1d(q_data);
   free_1d(light_curve);
   free_1d(light_curve2);
+  //free_1d(y);
   return(0);
 }
 
@@ -718,15 +977,26 @@ void initialize_proposals(double *sigma, double ***history)
 	//jump sizes are set by hand based on what works
 	sigma[0]  = 1.0e-1;  //log M1 (MSUN)
 	sigma[1]  = 1.0e-1;  //log M2 (MSUN)
-	sigma[2]  = SIGMAP;  //log P (days)
-	sigma[3]  = 1.0e-1;  //e
-	sigma[4]  = 1.0e+0;  //inc (deg)
-	sigma[5]  = 1.0e+1;  //Omega (deg)
-	sigma[6]  = 1.0e+1;  //omega0 (deg)
+	sigma[2]  = 1.0e-1;  //log P (days)
+	sigma[3]  = 1.0e-2;  //e
+	sigma[4]  = 1.0e-2;  //inc (rad)
+	sigma[5]  = 1.0e-2;  //Omega (rad)
+	sigma[6]  = 1.0e-2;  //omega0 (rad)
 	sigma[7]  = 1.0e+0;  //T0 (day)
-	sigma[8]  = 1.0e-1;  //log flux normalization
-	sigma[9]  = 1.0e-2;  //log rr1 normalization
-	sigma[10]  = 1.0e-2;  //log rr2 normalization
+	sigma[8]  = 1.0e-2;  //log rr1 normalization
+	sigma[9]  = 1.0e-2;  //log rr2 normalization
+  sigma[10] = 1.0e-3;   // mu 1
+  sigma[11] = 1.0e-3;   // tau 1
+  sigma[12] = 1.0e-3;   // mu 2
+  sigma[13] = 1.0e-3;   // tau 2
+  sigma[14] = 1.0e-2;   // ref 1
+  sigma[15] = 1.0e-2;   // ref 2
+  sigma[16] = 1.0e-3;   // extra alph 1
+  sigma[17] = 1.0e-3;   // extra alph 2
+  sigma[18] = 1.0e-2;   // temp 1
+  sigma[19] = 1.0e-2;   // temp 2
+  sigma[20] = 1.0e-2;   // blending
+  sigma[21] = 1.0e-3;   // flux tune
 	//if (burn_in == 0) for(i=0; i<NPARS; i++) sigma[i] /= 100;
 	
 	//for(i=0; i<NPARS; i++) sigma[i] /= ((double)(NPARS));
@@ -758,3 +1028,4 @@ void initialize_proposals(double *sigma, double ***history)
 	fclose(hfile);
 		 */
 }
+

@@ -53,10 +53,9 @@ double reflection(double P, double M1, double M2, double e, double inc,
                     double omega0, double nu , double R2, double alpha_ref1);
 double eclipse_area(double R1, double R2, 
                 double X1, double X2, double Y1, double Y2);
+void calc_mags(double params[],  double D, double *Gmg, double *BminusV, 
+double *VminusG, double *GminusT);
 void calc_light_curve(double *times, long Nt, double *pars,  double *template);
 double loglikelihood(double time[], double lightcurve[], double noise[],
-		     long N, double params[], double mag_data[], double magerr[], double weight);
-void free_1d(double *arr);
-void free_2d(double **arr, int size);
-void free_3d(double ***arr, int size1, int size2);
-double _getT(double logM);
+		     long N, double params[], double mag_data[], double magerr[],
+         int savedata);
