@@ -61,3 +61,4 @@ void free_1d(double *arr);
 void free_2d(double **arr, int size);
 void free_3d(double ***arr, int size1, int size2);
 double _getT(double logM);
+double _getR(double logM);

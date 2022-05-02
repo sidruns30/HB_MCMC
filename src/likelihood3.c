@@ -193,10 +193,10 @@ double get_alpha_beam(double logT){
     double logTs[4] = {3.5, 3.7, 3.9, 4.5};
 
     // Return endpoints if temperature is outside the domain
-    if (logT > logTs[3]) return 1.2/4;
+    if (logT >= logTs[3]) return 1.2/4;
     if (logT < logTs[0]) return 6.5/4;
 
-    int j = 4;
+    int j = 3;
     while(logT < logTs[j]) j--;
 
     return (alphas[j+1] + (alphas[j+1] - alphas[j]) / (logTs[j+1] - logTs[j]) * (logT - logTs[j+1]))/4;
@@ -783,6 +783,10 @@ void calc_radii_and_Teffs(double params[],  double *R1, double *R2, double *Teff
 
     *Teff1 = pow(10., _getT(logM1) + alpha_Teff_1*envelope_Temp(logM1));
     *Teff2 = pow(10., _getT(logM2) + alpha_Teff_2*envelope_Temp(logM2));
+    //printf("logM1,alpha_Teff1: %f, %f\n", logM1,alpha_Teff_1);
+    //printf("logM2,alpha_Teff2: %f, %f\n", logM2,alpha_Teff_2);
+    //printf("getT,envTemp: %f, %f\n", _getT(logM2),envelope_Temp(logM2));
+    //printf("Teff1,Teff2: %f, %f\n", *Teff1,*Teff2);
 };
 
 /*
