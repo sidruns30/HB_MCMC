@@ -193,10 +193,10 @@ double get_alpha_beam(double logT){
     double logTs[4] = {3.5, 3.7, 3.9, 4.5};
 
     // Return endpoints if temperature is outside the domain
-    if (logT >= logTs[3]) return 1.2/4;
+    if (logT > logTs[3]) return 1.2/4;
     if (logT < logTs[0]) return 6.5/4;
 
-    int j = 3;
+    int j = 4;
     while(logT < logTs[j]) j--;
 
     return (alphas[j+1] + (alphas[j+1] - alphas[j]) / (logTs[j+1] - logTs[j]) * (logT - logTs[j+1]))/4;
@@ -562,7 +562,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
 	if (ALPHA_MORE ==1){
 	  //extra alphas
 	  extra_alpha_beam_1 = exp(pars[16]);//pow(10., pars[16]);
-	  extra_alpha_beam_2 = exp(pars[17]);//pow(10., pars[17]);
+	  extra_alpha_beam_1 = exp(pars[17]);//pow(10., pars[17]);
 	  alpha_Teff_1 = pars[18];//pow(10., pars[18]);
 	  alpha_Teff_2 = pars[19];//pow(10., pars[19]);
 
@@ -757,37 +757,6 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
 
     //fclose(lc_file);
 }
-
-/*
-Compute the radius and Teff for each star
-Radii are in solar units
-Teffs in K
-*/
-void calc_radii_and_Teffs(double params[],  double *R1, double *R2, double *Teff1, double* Teff2) {
-    // Calculate R1, R2, T1, T2 from the parameters
-    // Compute effective temperature and radius 
-    double logM1 = params[0];
-    double logM2 = params[1];
-    double rr1 = params[8];
-    double rr2 = params[9];
-    double alpha_Teff_1 = 0.;
-    double alpha_Teff_2 = 0.;
-    if (ALPHA_MORE)
-    {
-        alpha_Teff_1 = params[18];
-        alpha_Teff_2 = params[19];
-    }
-
-    *R1 = pow(10., _getR(logM1) + rr1*envelope_Radius(logM1)); 
-    *R2 = pow(10., _getR(logM2) + rr2*envelope_Radius(logM2)); 
-
-    *Teff1 = pow(10., _getT(logM1) + alpha_Teff_1*envelope_Temp(logM1));
-    *Teff2 = pow(10., _getT(logM2) + alpha_Teff_2*envelope_Temp(logM2));
-    //printf("logM1,alpha_Teff1: %f, %f\n", logM1,alpha_Teff_1);
-    //printf("logM2,alpha_Teff2: %f, %f\n", logM2,alpha_Teff_2);
-    //printf("getT,envTemp: %f, %f\n", _getT(logM2),envelope_Temp(logM2));
-    //printf("Teff1,Teff2: %f, %f\n", *Teff1,*Teff2);
-};
 
 /*
 Star color calculator

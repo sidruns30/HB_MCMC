@@ -699,3 +699,69 @@ void differential_evolution_proposal(double *x, long *seed, double **history, do
   for (n = 0; n < NPARS; n++)
     y[n] = x[n] + dx[n];
 }
+
+
+int main()
+{
+    
+    FILE *par_file, *lc_file;
+    char *par_fname = "synthetic_lc_parameters.txt";
+    par_file = fopen(par_fname, "w");
+
+    fprintf(par_file, "logM1\tlogM2\tlogP\te\tinc\tOmega\tomega\tT0\trr1\trr2\tblending\n");
+    double more_pars[NPARS];
+
+    for (int lc_id=0; lc_id<100000; lc_id ++)
+    {
+    
+        more_pars[0] =          -0.2 + 2*((double)rand()/RAND_MAX - 0.5) * 1;  /*logM1 Uniform in log space from .06 to 6.3 Msun*/
+        more_pars[1] =          -0.2 + 2*((double)rand()/RAND_MAX - 0.5) * 1;  /*logM2*/
+        more_pars[2] =           0.5 + 2*((double)rand()/RAND_MAX - 0.5) * .5; /*logP Uniform in log space from to 1. to 10 days*/
+        more_pars[3] =           0*0.35 + 0*((double)rand()/RAND_MAX - 0.5) * .35; /*e* Unifrom between 0 and 0.7*/
+        more_pars[4] =           PI/2 + 2*((double)rand()/RAND_MAX - 0.5) * .35; /*inc (rad) Uniform between 70 and 110 degrees*/
+        more_pars[5] =           0.   + 2*((double)rand()/RAND_MAX - 0.5) * PI;    /*Omega (rad) Doesn't really matter!*/
+        more_pars[6] =           0.   + 2*((double)rand()/RAND_MAX - 0.5) * PI;     /*omega0 (rad)  Uniform between -PI and PI*/
+        more_pars[7] =           0.   + 2*((double)rand()/RAND_MAX - 0.5) * 1000.;     /*T0 (JD) Uniform between -1000 and 1000*/
+        more_pars[8] =           0.15 + 2*((double)rand()/RAND_MAX - 0.5) * .15;    /*rr1  Uniform between 0 and factor of 2 in radius (logspace)*/
+        more_pars[9] =           0.15 + 2*((double)rand()/RAND_MAX - 0.5) * .15;    /*rr2  Uniform between 0 and factor of 2 in radius (logspace)*/
+        more_pars[10] =           0.15;   /*mu 1*/
+        more_pars[11] =           0.35;   /*tau 1*/
+        more_pars[12] =           0.15;   /*mu 2*/
+        more_pars[13] =           0.35;   /*tau 2*/ 
+        more_pars[14] =           0.5;    /*ref 1*/
+        more_pars[15] =           0.5;    /*ref 2*/
+        more_pars[16] =           0.;     /*beam 1*/
+        more_pars[17] =           0.;     /*beam 2*/
+        more_pars[18] =           0.;   /*Teff 1*/
+        more_pars[19] =           0.;  /*Teff 2*/
+        more_pars[20] =           0.2 + 2*((double)rand()/RAND_MAX - 0.5) * .2; /*blending  uniform between 0 and 0.4 */
+        more_pars[21] =           1.;      /*Flux tune*/
+
+        for (int l=0;l<10;l++)
+        {
+            fprintf(par_file, "%f\t", more_pars[l]);
+        }
+        fprintf(par_file, "%f\n", more_pars[20]);
+
+        char lc_fname[100];
+        sprintf(lc_fname, "/scratch/ssolanski/lc_samples/%06d.txt", lc_id);
+
+        write_lc_to_file(more_pars, lc_fname);
+
+    }
+
+    fclose(par_file);
+    
+    /*
+    char *fname = "synthetic_lc.txt";
+
+    write_lc_to_file(john_pars, fname2);
+
+
+    printf("lcs written to files ");
+    double tmp1, tmp2, tmp3, tmp4;
+    calc_mags(more_pars, 2011., &tmp1, &tmp2, &tmp3, &tmp4);
+    */
+    return 1;
+    
+}
