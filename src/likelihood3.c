@@ -843,7 +843,6 @@ double *VminusG, double *GminusT)
   {
     blending = params[20];
   }
-
   for (j=0;j<4;j++) {
     nu[j]=C/(lam[j]*1e-7);
     f_nu[j]=PI*(R1*R1*(2.*h*CUBE(nu[j])/SQR(C)/(exp(h*nu[j]/(k*Teff1))-1.))+
@@ -882,8 +881,8 @@ Parameters:
  */
 
 double loglikelihood(double time[], double lightcurve[], double noise[],
-		     long N, double params[], double mag_data[], double magerr[],
-             double weight)
+		     long N, double params[], double mag_data[], double magerr[], 
+             int savedata)
 {
   double *template;
   double residual;
@@ -896,18 +895,30 @@ double loglikelihood(double time[], double lightcurve[], double noise[],
   //compute template light curve
   calc_light_curve(time,N,params,template);
 	
+    FILE* likelihood_file;
+    if (savedata)
+    {
+        char *lik_fname = "../debug/likelihood_original.txt";
+        likelihood_file = fopen(lik_fname, "w");
+    }
+
   //sum square of residual to get chi-squared
   chi2 = 0.;
   for (i=0;i<N;i++) 
     { // bound on the noise:
       if (noise[i] < 1.e-5) 
       {
-          printf("Old noise: %f\n" ,noise[i]);
           noise[i] = 1.e-5;
       }
 
       residual = (template[i]-lightcurve[i])/noise[i];
       chi2    += residual*residual;
+
+      if (savedata)
+        {
+            fprintf(likelihood_file, "%.10g\t%.10g\t%.10g\t%.10g\n", 
+            template[i], lightcurve[i], noise[i], chi2);
+        }
     }
   //printf("chain chi2 is: %.10e\n", chi2);
   //free memory
@@ -925,10 +936,19 @@ double loglikelihood(double time[], double lightcurve[], double noise[],
   for (i=0;i<4;i++)
   {
     residual = (computed_mags[i] - mag_data[i+1])/magerr[i];
-    chi2 += weight*residual*residual;
+    chi2 += residual*residual;
+
+    if (savedata)
+        {
+            fprintf(likelihood_file, "%.10g\t%.10g\t%.10g\t%.10g\n", 
+            computed_mags[i], mag_data[i+1], magerr[i], chi2);
+        }
   }
 
-
+    if (savedata)
+    {
+        fclose(likelihood_file);
+    }
   //return log likelihood
   return(-chi2/2.0);
 }
@@ -1004,60 +1024,69 @@ void write_lc_to_file(double pars[], char fname[])
 //Leave commented out unless for debugging purposes
 
 /*
-Function to write the lightcurve in a text file given the list of input parameters
-for three periods
-*/
-/*
-void write_lc_to_file(double pars[], char fname[])
+int main()
 {
-    // Construct the time array
-    const int N = 1000;
-    double period = pow(10., pars[2]);
-    double times[N]; 
-    for (int i=0; i<N; i++)
+    
+    FILE *par_file, *lc_file;
+    //char *par_fname = "synthetic_lc_parameters.txt";
+    //par_file = fopen(par_fname, "w");
+
+    //fprintf(par_file, "logM1\tlogM2\tlogP\te\tinc\tOmega\tomega\tT0\trr1\trr2\tblending\n");
+    double more_pars[NPARS];
+
+    for (int lc_id=0; lc_id<2; lc_id ++)
     {
-        times[i] = (double)i * (3 * period) / (double) N;
+    
+        more_pars[0] =          .3;//-0.2 + 2*((double)rand()/RAND_MAX - 0.5) * 1;  logM1 Uniform in log space from .06 to 6.3 Msun
+        more_pars[1] =          .3;//-0.2 + 2*((double)rand()/RAND_MAX - 0.5) * 1;  logM2
+        more_pars[2] =           .84;//0.5 + 2*((double)rand()/RAND_MAX - 0.5) * .5; logP Uniform in log space from to 1. to 10 days
+        more_pars[3] =           .58;//0*0.35 + 0*((double)rand()/RAND_MAX - 0.5) * .35; e* Unifrom between 0 and 0.7
+        more_pars[4] =           .74;//PI/2 + 2*((double)rand()/RAND_MAX - 0.5) * .35; inc (rad) Uniform between 70 and 110 degrees
+        more_pars[5] =           0.   + 2*((double)rand()/RAND_MAX - 0.5) * PI;    //Omega (rad) Doesn't really matter!
+        more_pars[6] =           1.18 + PI;//0.   + 2*((double)rand()/RAND_MAX - 0.5) * PI;     omega0 (rad)  Uniform between -PI and PI
+        more_pars[7] =           0.   + 2*((double)rand()/RAND_MAX - 0.5) * 1000.;     //T0 (JD) Uniform between -1000 and 1000
+        more_pars[8] =           0.;//0.15 + 2*((double)rand()/RAND_MAX - 0.5) * .15;    //rr1  Uniform between 0 and factor of 2 in radius (logspace)
+        more_pars[9] =           0.;//0.15 + 2*((double)rand()/RAND_MAX - 0.5) * .15;    //rr2  Uniform between 0 and factor of 2 in radius (logspace)
+        more_pars[10] =           0.15;   /*mu 1
+        more_pars[11] =           0.35;   /*tau 1
+        more_pars[12] =           0.15;   /*mu 2
+        more_pars[13] =           0.35;   /*tau 2 
+        more_pars[14] =           0.5;    /*ref 1
+        more_pars[15] =           0.5;    /*ref 2
+        more_pars[16] =           0.;     /*beam 1
+        more_pars[17] =           0.;     /*beam 2
+        more_pars[18] =           0.;   /*Teff 1
+        more_pars[19] =           0.;  /*Teff 2
+        more_pars[20] =           0.2 + 2*((double)rand()/RAND_MAX - 0.5) * .2; /*blending  uniform between 0 and 0.4 
+        more_pars[21] =           1.;      /*Flux tune
+
+        //for (int l=0;l<10;l++)
+        //{
+        //    fprintf(par_file, "%f\t", more_pars[l]);
+        //}
+        //fprintf(par_file, "%f\n", more_pars[20]);
+
+        char lc_fname[100];
+        sprintf(lc_fname, "thompson_lc.txt");//"/scratch/ssolanski/lc_samples/%06d.txt", lc_id);
+
+        write_lc_to_file(more_pars, lc_fname);
+
     }
 
-    double *template;
-    printf("Allocating memory \n");
-    if (SAVECOMP)
-    {
-        template = (double *)malloc(5*N*sizeof(double));
-        
-    }
+    //fclose(par_file);
+    
+    /*
+    char *fname = "synthetic_lc.txt";
 
-    else
-    {
-        template = (double *)malloc(N*sizeof(double));
-    }
-
-    printf("Size of template array is %d \n", sizeof(template));
+    write_lc_to_file(john_pars, fname2);
 
 
-    printf("Allocated memory, calculating lc \n");
-
-    calc_light_curve(times, N, pars,template);
-
-    printf("Calculated lc, moving on to saving \n");
-
-    FILE *lcfile = fopen(fname, "w");
-
-    for (int i=0; i<N; i++)
-    {
-        if (SAVECOMP)
-        {
-            fprintf(lcfile, "%12.5e\t%12.5e\t%12.5e\t%12.5e\t%12.5e\t%12.5e\n", 
-            times[i], template[i], template[N+i], template[2*N+i], template[3*N+i], template[4*N+i]);
-        }
-
-        else
-        {
-            fprintf(lcfile, "%12.5e\t%12.5e\n", times[i], template[i]);
-        }
-    }
-
-    fclose(lcfile);
+    printf("lcs written to files ");
+    double tmp1, tmp2, tmp3, tmp4;
+    calc_mags(more_pars, 2011., &tmp1, &tmp2, &tmp3, &tmp4);
+    
+    return 1;
+    
 }
 */
 /*
