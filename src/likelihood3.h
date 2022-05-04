@@ -56,6 +56,12 @@ double eclipse_area(double R1, double R2,
 void calc_mags(double params[],  double D, double *Gmg, double *BminusV, 
 double *VminusG, double *GminusT);
 void calc_light_curve(double *times, long Nt, double *pars,  double *template);
+void calc_radii_and_Teffs(double params[],  double *R1, double *R2, double *Teff1, double* Teff2);
+void free_1d(double *arr);
+void free_2d(double **arr, int size);
+void free_3d(double ***arr, int size1, int size2);
+double _getT(double logM);
+double _getR(double logM);
 double loglikelihood(double time[], double lightcurve[], double noise[],
 		     long N, double params[], double mag_data[], double magerr[],
          int savedata);
