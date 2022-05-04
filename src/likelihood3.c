@@ -562,7 +562,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
 	if (ALPHA_MORE ==1){
 	  //extra alphas
 	  extra_alpha_beam_1 = exp(pars[16]);//pow(10., pars[16]);
-	  extra_alpha_beam_1 = exp(pars[17]);//pow(10., pars[17]);
+	  extra_alpha_beam_2 = exp(pars[17]);//pow(10., pars[17]);
 	  alpha_Teff_1 = pars[18];//pow(10., pars[18]);
 	  alpha_Teff_2 = pars[19];//pow(10., pars[19]);
 
