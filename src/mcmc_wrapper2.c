@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
   strcpy(RUN_ID,argv[2]);;
   ls_period = (double)atof(argv[3]);
   run = atoi(argv[4]);
-  
+
   if (ENABLE_OPENMP)
   {
     // 25 threads give optimum speed for a 1e4 likelihood evaluations
@@ -88,10 +88,7 @@ int main(int argc, char* argv[])
     acc_arr[i] = 0;
 
     // To differentiate the starting seeds in openmp runs
-    if (ENABLE_OPENMP)
-    {
-      seeds[i] += run;
-    }
+    seeds[i] += run;
 
     // for parallel random number generation
     states[i].idum2 = 123456789;
@@ -132,6 +129,16 @@ int main(int argc, char* argv[])
   strcat(outname,"../data/lightcurves/mcmc_lightcurves/");
   strcat(outname,RUN_ID);
   strcat(outname,"_no_GAIA");
+
+  if (USE_COLOR_INFO)
+  {
+    strcat(subparname, "_color");
+    strcat(parname, "_color");
+    strcat(chainname, "_color");
+    strcat(logLname, "_color");
+    strcat(logname, "_color");
+    strcat(outname, "_color");
+  }
 
   if (ENABLE_OPENMP)
   {
@@ -290,8 +297,10 @@ int main(int argc, char* argv[])
 
   // Read the magnitude data
   printf("Opening magnitude file");
-  if (exists(mag_name))
+  if (exists(mag_name) && (USE_COLOR_INFO))
   {
+    printf("Using color information \n");
+    weight = 1;
     mag_file = fopen(mag_name, "r");
     fscanf(mag_file, "%lf\n", &tmp1);
     mag_data[0] = tmp1;
@@ -308,7 +317,7 @@ int main(int argc, char* argv[])
 
   else
   {
-    printf("Magnitude file not found; assigning infinite error to mag data \n");
+    printf("Magnitude file not found/used; assigning infinite error to mag data \n");
     weight = 0;
     mag_data[0] = 1000.;
     for (i=0;i<4;i++)
