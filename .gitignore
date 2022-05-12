@@ -3,3 +3,5 @@
 src/test.png
 src/**.py
 src/extra.c
+src/compare.compare
+core*

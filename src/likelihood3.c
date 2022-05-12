@@ -585,6 +585,13 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
         alpha_ref_2 = .1;
     }
     
+    // Order the masses
+    if (logM2 > logM1)
+    {
+        swap(&logM1, &logM2);
+    }
+
+
     double M1 = pow(10., logM1);
     double M2 = pow(10., logM2);
 
@@ -937,7 +944,7 @@ double loglikelihood(double time[], double lightcurve[], double noise[],
 
   if (RocheOverFlowFlag)
   {
-    chi2 = __DBL_MAX__;
+    chi2 = BIG_NUM;
   }
 
   //return log likelihood

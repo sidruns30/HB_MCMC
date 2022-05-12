@@ -22,17 +22,21 @@
     #define NPARS 10
 #endif
 #define SAVECOMP 0 // Save the individual lightcurve components in the txt file
+#define BIG_NUM 1.e15
 
 #define SQR(x) ((x)*(x))
 #define CUBE(x) ((x)*(x)*(x))
 #define QUAD(x) ((x)*(x)*(x)*(x))
 
-struct bounds{
+
+struct bounds
+{
   double lo;
   double hi;
 };
 
-struct gauss_bounds{
+struct gauss_bounds
+{
   int flag;
 };
 

@@ -8,7 +8,7 @@
 int main(int argc, char* argv[])
 {
   // Run variables
-  static long NITER;
+  long NITER;
   long iter;
   
   double logLy;
@@ -43,27 +43,28 @@ int main(int argc, char* argv[])
   double *rdata, *a_data, *a_model, *e_data, *t_data;
   double *mag_data, *mag_err;
   FILE *param_file, *data_file, *chain_file, *logL_file, *mag_file, *logfile;
-  char  pfname[80] = "";
-  char  dfname[80] = "";
-  char  parname[80] = "";
-  char  subparname[80] = "";
-  char  outname[80] = "";
-  char  chainname[80] = "";
-  char  logLname[80] = "";
-  char  RUN_ID[11] = "";
-  char  mag_name[80] = "";
-  char logname[80] = "";
+  char  pfname[150] = "";
+  char  dfname[150] = "";
+  char  parname[150] = "";
+  char  subparname[150] = "";
+  char  outname[150] = "";
+  char  chainname[150] = "";
+  char  logLname[150] = "";
+  char  RUN_ID[50] = "";
+  char  mag_name[150] = "";
+  char logname[150] = "";
   
   // Temporary variables
   double tmp, tmp1, tmp2, tmp3, tmp4;              
-  long i, j, k, m, subi;              
   long Nt, subN;
 
   // Miscellaneous
   int run;
-  static int weight;
+  int weight;
   double ls_period;
-  char suffix[30];
+  char prefix[100] = "";
+  char suffix[100] = "";
+  char run_num[15] = "";
 
   NITER = (long)atoi(argv[1]);
   strcpy(RUN_ID,argv[2]);;
@@ -82,13 +83,11 @@ int main(int argc, char* argv[])
 
   for (int i=0; i<NCHAINS; i++)
   {
-    seeds[i] = i;
+    // To differentiate the starting seeds in openmp runs
+    seeds[i] = i + run;
     DEtrial_arr[i] = 0;
     DEacc_arr[i] = 0;
     acc_arr[i] = 0;
-
-    // To differentiate the starting seeds in openmp runs
-    seeds[i] += run;
 
     // for parallel random number generation
     states[i].idum2 = 123456789;
@@ -104,61 +103,39 @@ int main(int argc, char* argv[])
 
 
   // Initialize the file names
-  sprintf(suffix, "%d", run);
-
-  strcat(subparname,"../data/subpars/subpar.");
-  strcat(subparname,RUN_ID);
-  strcat(subparname,"_no_GAIA");
-
-  strcat(parname,"../data/pars/par.");
-  strcat(parname,RUN_ID);
-  strcat(parname,"_no_GAIA");
-
-  strcat(chainname,"../data/chains/chain.");
-  strcat(chainname,RUN_ID);
-  strcat(chainname,"_no_GAIA");
-
-  strcat(logLname,"../data/logL/logL.");
-  strcat(logLname,RUN_ID);
-  strcat(logLname,"_no_GAIA");
+  sprintf(prefix, "/scratch/ssolanski/HB_MCMC/data");
+  sprintf(run_num, "_%d", run);
+  strcat(suffix,RUN_ID);
   
-  strcat(logname,"../debug/log.");
-  strcat(logname,RUN_ID);
-  strcat(logname,"_no_GAIA");
-
-  strcat(outname,"../data/lightcurves/mcmc_lightcurves/");
-  strcat(outname,RUN_ID);
-  strcat(outname,"_no_GAIA");
-
   if (USE_COLOR_INFO)
   {
-    strcat(subparname, "_color");
-    strcat(parname, "_color");
-    strcat(chainname, "_color");
-    strcat(logLname, "_color");
-    strcat(logname, "_color");
-    strcat(outname, "_color");
+    strcat(suffix, "_color");
   }
 
   if (ENABLE_OPENMP)
   {
-    strcat(subparname, "_OMP.dat");
-    strcat(parname, "_OMP.dat");
-    strcat(chainname, "_OMP.dat");
-    strcat(logLname, "_OMP.dat");
-    strcat(logname, "_OMP.dat");
-    strcat(outname, "_OMP.out");
+    strcat(suffix, "_OMP");
   }
 
-  else
-  {
-    strcat(subparname, ".dat");
-    strcat(parname, ".dat");
-    strcat(chainname, ".dat");
-    strcat(logLname, ".dat");
-    strcat(logname, ".dat");
-    strcat(outname, ".out");
-  }
+  strcat(suffix, run_num);
+
+  strcat(subparname, prefix);
+  strcat(parname, prefix);
+  strcat(chainname, prefix);
+  strcat(logLname, prefix);
+  strcat(logname, prefix);
+  strcat(outname, prefix);
+  strcat(mag_name, prefix);
+  strcat(dfname, prefix);
+
+  strcat(subparname,"/subpars/subpar.");
+  strcat(parname,   "/pars/par.");
+  strcat(chainname, "/chains/chain.");
+  strcat(logLname,  "/logL/logL.");
+  strcat(logname,   "/log/log.");
+  strcat(outname,   "/lightcurves/mcmc_lightcurves/");
+  strcat(mag_name,  "/magnitudes/");
+  strcat(dfname,    "/lightcurves/folded_lightcurves/");
 
   strcat(subparname, suffix);
   strcat(parname, suffix);
@@ -167,11 +144,15 @@ int main(int argc, char* argv[])
   strcat(logname, suffix);
   strcat(outname, suffix);
 
-  strcpy(mag_name,"../data/magnitudes/");
+  strcat(subparname, ".dat");
+  strcat(parname, ".dat");
+  strcat(chainname, ".dat");
+  strcat(logLname, ".dat");
+  strcat(logname, ".dat");
+  strcat(outname, ".out");
+
   strcat(mag_name,RUN_ID);
   strcat(mag_name,".txt");
-
-  strcpy(dfname,"../data/lightcurves/folded_lightcurves/");
   strcat(dfname,RUN_ID);
   strcat(dfname,"_new.txt");
 
@@ -183,18 +164,17 @@ int main(int argc, char* argv[])
   printf("logfile: %s\n", logname);
 
   // Allocate memory for the mcmc arrays
-
   x = (double **)malloc(NCHAINS*sizeof(double));
-  for(i=0;i<NCHAINS;i++) 
+  for(int i=0;i<NCHAINS;i++) 
   {
     x[i]=(double *)malloc(NPARS*sizeof(double));
   }
   
   history = (double ***)malloc(NCHAINS*sizeof(double));
-  for(i=0;i<NCHAINS;i++)
+  for(int i=0;i<NCHAINS;i++)
   {
     history[i]=(double **)malloc(NPAST*sizeof(double));
-    for(j=0;j<NPAST;j++)
+    for(int j=0;j<NPAST;j++)
     {
       history[i][j]=(double *)malloc(NPARS*sizeof(double));
     }
@@ -203,7 +183,7 @@ int main(int argc, char* argv[])
   sigma = (double *)malloc(NPARS*sizeof(double));
 
   // Initialize priors
-  set_limits(limited,limits, gauss_pars);
+  set_limits(limited, limits, gauss_pars);
   
   // Set up proposal distribution
   initialize_proposals(sigma, history);
@@ -215,7 +195,7 @@ int main(int argc, char* argv[])
   {
     printf("Reading contents from parameter file \n");
     param_file = fopen(parname, "r");
-    for (i=0;i<NPARS;i++) 
+    for (int i=0;i<NPARS;i++) 
     {
       fscanf(param_file,"%lf\n", &tmp); 
       printf("Par %d value: %.5e \n",i, tmp);
@@ -223,7 +203,7 @@ int main(int argc, char* argv[])
       x[0][i]  = tmp;
       xmap[i]  = tmp;
 
-      for(j=1; j<NCHAINS; j++) 
+      for(int j=1; j<NCHAINS; j++) 
       {
         x[j][i]  = tmp;
       }
@@ -235,9 +215,9 @@ int main(int argc, char* argv[])
   else 
   {
     printf("Parameter file not found, assigning random pars \n");
-    for (i=0;i<NPARS;i++) 
+    for (int i=0;i<NPARS;i++) 
     {
-      for(j=0; j<NCHAINS; j++) 
+      for(int j=0; j<NCHAINS; j++) 
       {
         tmp1 = ran2_parallel(&seeds[0], &states[0]);
         x[j][i] = (limits[i].lo + tmp1*(limits[i].hi - limits[i].lo));
@@ -260,7 +240,7 @@ int main(int argc, char* argv[])
     rdata        = (double *)malloc(3*Nt*sizeof(double));
     index        = (int *)malloc(NCHAINS*sizeof(int));
 
-    for (i=0; i<Nt; i++) 
+    for (int i=0; i<Nt; i++) 
     {
       fscanf(data_file,"%lf\t%lf\t%lf\n", &tmp1, &tmp2, &tmp3);
       rdata[i*3]=tmp1;
@@ -288,7 +268,7 @@ int main(int argc, char* argv[])
   mag_data     = (double *)malloc(5*sizeof(double));
   mag_err     = (double *)malloc(4*sizeof(double));
   
-  for (subi=0;subi<Nt;subi++) 
+  for (int subi= 0; subi<Nt; subi++) 
   {
     t_data[subi] = rdata[subi*3]; 
     a_data[subi] = rdata[subi*3+1]; 
@@ -304,7 +284,7 @@ int main(int argc, char* argv[])
     mag_file = fopen(mag_name, "r");
     fscanf(mag_file, "%lf\n", &tmp1);
     mag_data[0] = tmp1;
-    for (i=0;i<4;i++)
+    for (int i=0;i<4;i++)
     {
       fscanf(mag_file, "%lf\t%lf\n", &tmp1, &tmp2);
       mag_data[i+1] = tmp1;
@@ -320,10 +300,10 @@ int main(int argc, char* argv[])
     printf("Magnitude file not found/used; assigning infinite error to mag data \n");
     weight = 0;
     mag_data[0] = 1000.;
-    for (i=0;i<4;i++)
+    for (int i=0;i<4;i++)
     {
       mag_data[i+1] = 1.;
-      mag_err[i] = __DBL_MAX__;
+      mag_err[i] = BIG_NUM;
     } 
   }
 
@@ -332,7 +312,7 @@ int main(int argc, char* argv[])
   temp[0] = 1.0;
   index[0] = 0;
   
-  for(i=1; i<NCHAINS; i++) 
+  for(int i=1; i<NCHAINS; i++) 
   {
     temp[i]  = temp[i-1]*dtemp;
     index[i] = i;
@@ -341,7 +321,7 @@ int main(int argc, char* argv[])
   // Perform first likelihood evaluation
   logLmap = loglikelihood(t_data,a_data,e_data,subN, x[0], mag_data, mag_err, weight);
   
-  for(i=0; i<NCHAINS; i++) 
+  for(int i=0; i<NCHAINS; i++) 
   {
     logLx[i] = logLmap;
   }
@@ -360,10 +340,10 @@ int main(int argc, char* argv[])
   for (iter=0; iter<NITER; iter++) 
   {
 
-    k = iter - (iter / NPAST) * NPAST;
+    int k = iter - (iter / NPAST) * NPAST;
 
-    #pragma omp parallel for schedule(static) if(ENABLE_OPENMP)
-    for(j=0; j<NCHAINS; j++) 
+    #pragma omp parallel for schedule(static) if(ENABLE_OPENMP) private(logLy)
+    for(int j=0; j<NCHAINS; j++) 
     {
       // Test parameters
       double y[NPARS];
@@ -373,6 +353,7 @@ int main(int argc, char* argv[])
 
       // Jump scale and steps
       double jscale = pow(10.,-6.+6.*alpha);
+
       double dx[NPARS];
       double dx_mag = 0;
       int jump = 0;
@@ -380,13 +361,7 @@ int main(int argc, char* argv[])
       int jump_type = 0;
 
       // Gaussian log priors
-      double logPx, logPy;
-
-      if (ENABLE_OPENMP)
-      {
-        #pragma omp atomic read
-        chain_id = index[j];         
-      }
+      double logPx=0., logPy=0.;
 
       // Take steps in parameter space
       if((ran2_parallel(&seeds[j], &states[j]) < 0.5) && (iter > NPAST)) 
@@ -413,7 +388,7 @@ int main(int argc, char* argv[])
         differential_evolution_proposal_parallel(x[chain_id], &seeds[j], history[j], y, &states[j]);
         jump_type = 2;
 
-        for (i=0;i<NPARS;i++) 
+        for (int i=0;i<NPARS;i++) 
         {
           dx_mag += (x[chain_id][i] - y[i]) * (x[chain_id][i] - y[i]);
         }
@@ -426,7 +401,7 @@ int main(int argc, char* argv[])
       }
 
       // Enforce priors
-      for (i=0;i<NPARS;i++) 
+      for (int i=0;i<NPARS;i++) 
       {
 	      // Reflecting boundary conditions
 	      while (((limited[i].lo == 1) && (y[i] < limits[i].lo)) || ((limited[i].hi == 1) && (y[i] > limits[i].hi)))
@@ -460,14 +435,14 @@ int main(int argc, char* argv[])
       logPy = get_logP(y, limited, limits, gauss_pars);
 
       //compute current and trial likelihood
-      logLx[chain_id] = loglikelihood(t_data,a_data,e_data,subN,x[chain_id], mag_data, mag_err, weight);
-      logLy = loglikelihood(t_data,a_data,e_data,subN,y, mag_data, mag_err, weight);
+      logLx[chain_id] = loglikelihood(t_data, a_data, e_data, subN, x[chain_id], mag_data, mag_err, weight);
+      logLy           = loglikelihood(t_data, a_data, e_data, subN, y, mag_data, mag_err, weight);
 
       /* evaluate new solution */
       alpha = ran2_parallel(&seeds[j], &states[j]);
 
       //Hasting's ratio
-      double H = exp((logLy-logLx[chain_id])/temp[j]) * pow(10., logPy - logPx);
+      double H = exp((logLy-logLx[chain_id])/temp[j]) *  pow(10., logPy - logPx);
 
       //conditional acceptance of y
       if (alpha <= H) 
@@ -485,7 +460,7 @@ int main(int argc, char* argv[])
           acc_arr[j]++;
         }
 
-	      for (i=0;i<NPARS;i++) 
+	      for (int i=0;i<NPARS;i++) 
         {
 	        x[chain_id][i] = y[i];
 	      }
@@ -496,15 +471,18 @@ int main(int argc, char* argv[])
         {
           DEacc_arr[j]++;
         }
+
       }
 
-    for(i=0; i<NPARS; i++) 
+    for(int i=0; i<NPARS; i++) 
     {
       history[j][k][i] = x[chain_id][i];
     }
 
+    //#pragma omp critical
+    //fprintf(logfile, "Iter: %d Thread id: %d Loop iter: %d index[j]: %d seed: %d cts: %d \n", iter, omp_get_thread_num(), j, index[j], seeds[j], states[j].cts);
   }
-
+  
     /********Chain Loop ends**********/
 
     for (int i=0; i<NCHAINS; i++)
@@ -517,11 +495,10 @@ int main(int argc, char* argv[])
       /* parallel tempering */
       ptmcmc(index, temp, logLx);
     }
-
     //update map parameters
     if (logLx[index[0]] > logLmap)
     {
-      for (i=0;i<NPARS;i++) 
+      for (int i=0;i<NPARS;i++) 
       {
 	      xmap[i]=x[index[0]][i];
       }
@@ -539,12 +516,12 @@ int main(int argc, char* argv[])
 
     atrial++;
 
-    if(iter%100==0) 
+    if(iter%1000==0) 
     {
       //print parameter chains
       fprintf(chain_file,"%ld %.12g ",iter/10,logLx[index[0]]);
 
-      for(i=0; i<NPARS; i++) 
+      for(int i=0; i<NPARS; i++) 
       {
         fprintf(chain_file,"%.12g ",x[index[0]][i]);
       }
@@ -554,7 +531,7 @@ int main(int argc, char* argv[])
       //print log likelihood chains
       fprintf(logL_file,"%ld ",iter/10);
 
-      for(i=0; i<NCHAINS; i++)
+      for(int i=0; i<NCHAINS; i++)
       {
         fprintf(logL_file,"%.12g ",logLx[index[i]]);
       }
@@ -574,7 +551,7 @@ int main(int argc, char* argv[])
       calc_light_curve(t_data,subN,xmap,a_model);
       fprintf(data_file,"%ld\n",subN);
 
-      for (i=0;i<subN;i++) 
+      for (int i=0;i<subN;i++) 
       {
 	      fprintf(data_file,"%12.5e %12.5e %12.5e\n",t_data[i],a_data[i],a_model[i]);
       }
@@ -598,7 +575,7 @@ int main(int argc, char* argv[])
   calc_light_curve(t_data,subN,xmap,a_model);
   fprintf(data_file,"%ld\n",subN);
 
-  for (i=0;i<subN;i++) 
+  for (int i=0;i<subN;i++) 
   {
     fprintf(data_file,"%12.5e %12.5e %12.5e\n",t_data[i],a_data[i],a_model[i]);
   }
@@ -677,7 +654,7 @@ void ptmcmc(int *index, double temp[], double logL[])
 	 */ 
 	
   /* Siddhant: b can be -1, gives seg fault, put bounds on b*/
-	b = (int)((double)rand()/(RAND_MAX)*((double)(NCHAINS-1)));
+	b = (int) (((double)rand()/(RAND_MAX))*((double)(NCHAINS-1)));
 	a = b + 1;
 	
 	olda = index[a];
@@ -689,7 +666,7 @@ void ptmcmc(int *index, double temp[], double logL[])
 	dlogL = logL2 - logL1;
 	H  = (heat2 - heat1)/(heat2*heat1);
 	alpha = exp(dlogL*H);
-	beta  = (double)rand()/(RAND_MAX);
+	beta  = ((double)rand()/(RAND_MAX));
 	if(alpha >= beta)
 	{
 		index[a] = oldb;
@@ -713,38 +690,39 @@ void ptmcmc(int *index, double temp[], double logL[])
 
 double ran2(long *idum)
 {
-	int j;
-	long k;
-	static long idum2=123456789; // some seed
-	static long iy=0;
-	static long iv[NTAB];
-	double temp;
-	
-	if (*idum <= 0) {
-		if (-(*idum) < 1) *idum=1;
-		else *idum = -(*idum);
-		idum2=(*idum);
-		for (j=NTAB+7;j>=0;j--) {
-			k=(*idum)/IQ1;
-			*idum=IA1*(*idum-k*IQ1)-k*IR1;
-			if (*idum < 0) *idum += IM1;
-			if (j < NTAB) iv[j] = *idum;
-		}
-		iy=iv[0];
-	}
-	k=(*idum)/IQ1;
-	*idum=IA1*(*idum-k*IQ1)-k*IR1;
-	if (*idum < 0) *idum += IM1;
-	k=idum2/IQ2;
-	idum2=IA2*(idum2-k*IQ2)-k*IR2;
-	if (idum2 < 0) idum2 += IM2;
-	j=iy/NDIV;
-	iy=iv[j]-idum2;
-	iv[j] = *idum;
-	if (iy < 1) iy += IMM1;
-	if ((temp=AM*iy) > RNMX) return RNMX;
-	else return temp;
+  int j;
+  long k;
+  static long idum2=123456789; // some seed
+  static long iy=0;
+  static long iv[NTAB];
+  double temp;
+  
+  if (*idum <= 0) {
+    if (-(*idum) < 1) *idum=1;
+    else *idum = -(*idum);
+    idum2=(*idum);
+    for (j=NTAB+7;j>=0;j--) {
+      k=(*idum)/IQ1;
+      *idum=IA1*(*idum-k*IQ1)-k*IR1;
+      if (*idum < 0) *idum += IM1;
+      if (j < NTAB) iv[j] = *idum;
+    }
+    iy=iv[0];
+  }
+  k=(*idum)/IQ1;
+  *idum=IA1*(*idum-k*IQ1)-k*IR1;
+  if (*idum < 0) *idum += IM1;
+  k=idum2/IQ2;
+  idum2=IA2*(idum2-k*IQ2)-k*IR2;
+  if (idum2 < 0) idum2 += IM2;
+  j=iy/NDIV;
+  iy=iv[j]-idum2;
+  iv[j] = *idum;
+  if (iy < 1) iy += IMM1;
+  if ((temp=AM*iy) > RNMX) return RNMX;
+  else return temp;
 }
+
 // gaussian random number
 double gasdev2(long *idum)
 {
@@ -1175,10 +1153,10 @@ void initialize_proposals(double *sigma, double ***history)
 	sigma[0]  = 1.0e-1;  //log M1 (MSUN)
 	sigma[1]  = 1.0e-1;  //log M2 (MSUN)
 	sigma[2]  = 1.0e-5;  //log P (days)
-	sigma[3]  = 1.0e-2;  //e
-	sigma[4]  = 1.0e-2;  //inc (rad)
+	sigma[3]  = 1.0e-4;  //e
+	sigma[4]  = 1.0e-3;  //inc (rad)
 	sigma[5]  = 1.0e-2;  //Omega (rad)
-	sigma[6]  = 1.0e-2;  //omega0 (rad)
+	sigma[6]  = 1.0e-3;  //omega0 (rad)
 	sigma[7]  = 1.0e-3;  //T0 (day)
 	sigma[8]  = 1.0e-2;  //log rr1 normalization
 	sigma[9]  = 1.0e-2;  //log rr2 normalization

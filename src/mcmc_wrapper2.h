@@ -3,11 +3,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
-#include<unistd.h>
+#include <unistd.h>
 #include <omp.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_cdf.h>
 #include "likelihood3.h"
 
 #define SQRT_2PI 2.5066282746
