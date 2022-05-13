@@ -272,7 +272,7 @@ int main(int argc, char* argv[])
   {
     t_data[subi] = rdata[subi*3]; 
     a_data[subi] = rdata[subi*3+1]; 
-    e_data[subi] = rdata[subi*3+2];
+    e_data[subi] = 2 * rdata[subi*3+2];
   }
 
   // Read the magnitude data
@@ -429,6 +429,17 @@ int main(int argc, char* argv[])
         }
 
       }
+
+      // Order the masses
+      if (y[1] > y[0])
+      {
+        double tmp = y[1];
+        y[1] = y[0];
+        y[0] = y[1];
+      }
+
+      // Make the phase modulo period
+      y[7] = fmod(y[7], y[2]);
 
       // Gaussian priors
       logPx = get_logP(x[chain_id], limited, limits, gauss_pars);
@@ -1152,7 +1163,7 @@ void initialize_proposals(double *sigma, double ***history)
 	//jump sizes are set by hand based on what works
 	sigma[0]  = 1.0e-1;  //log M1 (MSUN)
 	sigma[1]  = 1.0e-1;  //log M2 (MSUN)
-	sigma[2]  = 1.0e-12;  //log P (days)
+	sigma[2]  = 1.0e-8;  //log P (days)
 	sigma[3]  = 1.0e-4;  //e
 	sigma[4]  = 1.0e-3;  //inc (rad)
 	sigma[5]  = 1.0e-2;  //Omega (rad)

@@ -13,7 +13,7 @@
 #define GAMMA (2.388/sqrt(2.*NPARS))
 #define NUM_ELEMENTS(x) (size_of(x)/size_of(x[0]))
 #define USE_RAND_PARS 1
-#define USE_COLOR_INFO 0
+#define USE_COLOR_INFO 1
 #define ENABLE_OPENMP 1
 
 /* From likelihood.c */
