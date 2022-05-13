@@ -1,25 +1,134 @@
+# cython: language_level = 3
+
 cimport cython
 #cdef void calc_light_curve(double* times, double Nt, double*pars, double *template);
 import numpy as np
-cdef extern from "likelihood2.c":
-     void calc_light_curve(double* times, double Nt, double*pars, double *template);
-     pass
 
-#def lightcurve(times,double logMlens,double Mstar,double Pdays,double e,double sini,double omgf,double T0overP,double logFp50,double Fblend):
-def lightcurve(times,inpars):
-  logM1, logM2, logP_day, e, inc_deg, omega_deg,omega0_deg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale,log_blendFlux=inpars
-  cdef double pars[11]
+#cimport likelihood2
+cimport likelihood3
+import sys
+import traceback
+
+'''
+cpdef lightcurve2(times,inpars):
+  logM1, logM2, logP_day, e, inc, omega, omega0, T0_day,log_rad1_rescale,log_rad2_rescale,logTanom,blend_frac,logFluxTESS=inpars
+  cdef double pars[12]
   #need to convert angles from rad to deg here
   radeg=180/np.pi
-  pars[:]=[  logM1, logM2, logP_day, e, inc_deg*radeg, omega_deg*radeg,omega0_deg*radeg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale ]
+  pars[:]=[  logM1, logM2, logP_day, e, inc*radeg, omega*radeg,omega0*radeg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale, logTanom ]
   times=np.array(times)
   cdef int Nt=len(times)
   cdef double[:] ctimes = times
   cdef double[:] ctemplate=np.empty(Nt, dtype=np.double)
   #compute_lightcurve(&ctimes[0],&cAmags[0],Nt,&pars[0]);
-  calc_light_curve(&ctimes[0],Nt,&pars[0],&ctemplate[0]);
+  likelihood2.calc_light_curve(&ctimes[0],Nt,&pars[0],&ctemplate[0]);
   template=np.array(ctemplate)
-  return template+10**(log_blendFlux+logFluxTESS)
+  #return template+10**(log_blendFlux+logFluxTESS)
+  Flux_TESS = 10.**logFluxTESS
+  return 1*blend_frac + template*(1-blend_frac)
+'''
+
+cpdef lightcurve3(times,inpars):
+  logM1, logM2, logP_day, e, inc, omega0, T0_day, log_rad1_rescale, log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, ln_beam_resc_1, ln_beam_resc_2, alp_Teff_1, alp_Teff_2, blend_frac, flux_tune=inpars
+  cdef double pars[22]
+  #need to convert angles from rad to deg here
+  radeg=180/np.pi
+  pars[:]=[  logM1, logM2, logP_day, e, inc, 0, omega0, T0_day, log_rad1_rescale,log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, np.exp(ln_beam_resc_1), np.exp(ln_beam_resc_2), alp_Teff_1, alp_Teff_2, blend_frac, flux_tune]
+  times=np.array(times)
+  cdef int Nt=len(times)
+  cdef double[:] ctimes = times
+  cdef double[:] ctemplate=np.empty(Nt, dtype=np.double)
+  '''
+    c-code param definitions:
+
+    // Extract the paramters
+    double logM1 = pars[0];
+    double logM2 = pars[1];
+    // Period in seconds
+    double P = pow(10., pars[2])*SEC_DAY;
+    double Pdays = pow(10., pars[2]);
+    double e = pars[3];
+    double inc = pars[4];
+    double Omega = pars[5];
+    double omega0 = pars[6];
+    double T0 = pars[7]*SEC_DAY;
+    double rr1 = pow(10., pars[8]);
+    double rr2 = pow(10., pars[9]);
+    // Limb and gravity darkening coefficients respectively
+    mu_1 = pars[10];
+    tau_1 = pars[11];
+    mu_2 = pars[12];
+    tau_2 = pars[13];
+    // Reflection coefficients
+    alp_ref_1 = pars[14];
+    alp_ref_2 = pars[15];
+  '''
+  likelihood3.calc_light_curve(&ctimes[0],Nt,&pars[0],&ctemplate[0]);
+  template=np.array(ctemplate)
+  #return ( 1*blend_frac + template*(1-blend_frac) ) * flux_tune
+  return template  #blend_frac and flux_tune now in template
+
+cpdef calc_mags(params,Distance):
+  '''
+  Star magnitude and color calculator
+  Calculate apparent magnitudes B, G, V, and T given the stellar radii
+  R1,R2 in cm, T1,T2 in K, and D in pc. 
+
+  returns  [G, B-V, V-G, G-T]
+
+  '''
+  logM1, logM2, logP_day, e, inc, omega0, T0_day, log_rad1_rescale, log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, ln_beam_resc_1, ln_beam_resc_2, alp_Teff_1, alp_Teff_2, blend_frac, flux_tune=params[:-1]
+  cdef double cpars[22]
+  cdef double D,Gmag0,BmV0,VmG0,GmT0
+  #no need to convert angles from rad to deg here (because not used)
+  #radeg=180/np.pi
+  cpars[:]=[  logM1, logM2, logP_day, e, inc, 0, omega0, T0_day, log_rad1_rescale,log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, np.exp(ln_beam_resc_1), np.exp(ln_beam_resc_2), alp_Teff_1, alp_Teff_2, blend_frac, flux_tune]
+  Gmag0=0;BmV0=0;VmG0=0;GmT0=0
+  D=Distance
+  likelihood3.calc_mags(&cpars[0],D,&Gmag0,&BmV0,&VmG0,&GmT0)
+  return [Gmag0,BmV0,VmG0,GmT0]
+
+cpdef calc_radii_and_Teffs(params):
+  '''
+  Returns R1(Rsun),R2(Rsun),Teff1(K),Teff2(K)
+  '''
+  logM1, logM2, logP_day, e, inc, omega0, T0_day, log_rad1_rescale, log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, ln_beam_resc_1, ln_beam_resc_2, alp_Teff_1, alp_Teff_2, blend_frac, flux_tune=params
+  cdef double cpars[22]
+  cdef double R1,R2,Teff1,Teff2;
+  #no need to convert angles from rad to deg here (because not used)
+  #radeg=180/np.pi
+  cpars[:]=[  logM1, logM2, logP_day, e, inc, 0, omega0, T0_day, log_rad1_rescale,log_rad2_rescale, mu1, tau1, mu2, tau2, alprefl1, alprefl2, np.exp(ln_beam_resc_1), np.exp(ln_beam_resc_2), alp_Teff_1, alp_Teff_2, blend_frac, flux_tune]
+  R1=0;R2=0;Teff1=0;Teff2=0;
+
+  likelihood3.calc_radii_and_Teffs(&cpars[0],&R1,&R2,&Teff1,&Teff2)
+  #print('returning calc_radii_and_Teffs:',R1,R2,Teff1,Teff2)
+  return R1,R2,Teff1,Teff2
+
+cpdef getR(logM):
+  cdef x
+  x=logM
+  x=likelihood3._getR(x)
+  return x
+
+cpdef getT(logM):
+  cdef x
+  x=logM
+  x=likelihood3._getT(x)
+  return x
+
+
+cpdef envelope_Temp(logM):
+  cdef x
+  x=logM
+  x=likelihood3.envelope_Temp(x)
+  return x
+
+cpdef envelope_Radius(logM):
+  cdef x
+  x=logM
+  x=likelihood3.envelope_Radius(x)
+  return x
+
 
 class parspace:
   def __init__(self, *args):
@@ -74,7 +183,7 @@ class parspace:
     return not np.all(np.logical_and(np.array(pars)>=self.mins, np.array(pars)<=self.maxs))
     
 
-sp=parspace(
+sp2=parspace(
   'logM1', [ -1.5, 2.0 ],
   'logM2', [ -1.5, 2.0 ],
   'logP', [ -2.0, 3.0 ],
@@ -83,25 +192,68 @@ sp=parspace(
   'Omega', [ -np.pi, np.pi ],
   'Omega0', [ -np.pi, np.pi ],
   'T0', [ -1000, 1000 ],
-  'logFluxTESS', [ -5.0, 5.0 ],
-  'log_rad1_resc', [ -2.0, 2.0 ],
-  'log_rad2_resc', [ -2.0, 2.0 ],
-  'log_blendFlux', [ -6.0, 2.0 ])
-  
+  'log_rad1_resc', [ -2, 2 ],
+  'log_rad2_resc', [ -2, 2 ],
+  #'log_rad1_resc', [ -0.25, 1.25 ],
+  #'log_rad2_resc', [ -0.25, 1.25 ],
+  'logTanom', [ -0.5, 0.5 ],
+  'blend_frac', [ 0, 1.0 ],
+  'logFluxTESS', [ -10.0, 10.0 ],
+  'ln_noise_resc', [ -0.2, 0.2 ]
+)
 
-def likelihood(times,fluxes,errs,pars):
-  #logM1, logM2, logP_day, e, inc_deg, omega_deg,omega0_deg, T0_day,logFluxTESS,log_rad1_rescale,log_rad2_rescale,log_blendFlux=pars
+sp3=parspace(
+  'logM1', [ -1.5, 2.0 ],
+  'logM2', [ -1.5, 2.0 ],
+  'logP', [ -2.0, 3.0 ],
+  'e', [ 0, 1 ],
+  'inc', [ 0, np.pi ],
+  'omega0', [ -np.pi, np.pi ],
+  'T0', [ -1000, 1000 ],
+  'alp_rad1_resc', [ -1, 1 ],
+  'alp_rad2_resc', [ -1, 1 ],
+  'mu_1', [ 0.12, 0.20 ],
+  'tau_1', [ 0.30, 0.38 ],
+  'mu_2', [ 0.12, 0.20 ],
+  'tau_2', [ 0.30, 0.38 ],
+  'alp_ref_1', [0.8,1.2],
+  'alp_ref_2', [0.8,1.2],
+  'ln_beam_resc_1', [-0.1,0.1],
+  'ln_beam_resc_2', [-0.1,0.1],
+  'alp_Teff_1', [-1,1],
+  'alp_Teff_2', [-1,1],
+  'blend_frac', [ 0.0, 1.0 ],
+  'flux_tune', [ 0.99, 1.01 ],
+  'ln_noise_resc', [ -0.2, 0.2 ]
+)
+
+def likelihood(times,fluxes,errs,pars,lctype=3):
   minlike=-1e18
+  ln_noise_resc=pars[-1]
+  pars=pars[:-1]
   try:
-    modelfluxes=lightcurve(times, pars)
-    llike=-np.sum(((fluxes-modelfluxes)/errs)**2)/2
+    if lctype==2:
+      raise ValueError("lctype=2 no longer supported")
+      #modelfluxes=lightcurve2(times, pars)
+    elif lctype==3:
+      modelfluxes=lightcurve3(times, pars)
+    else:
+      raise ValueError('Unknown light curve model type.')
+    noise_resc=np.exp(ln_noise_resc)
+    sigmas=errs*noise_resc
+    llike = - np.sum(((fluxes-modelfluxes)/sigmas)**2)/2 - len(errs)*ln_noise_resc # - sum(np.log(2*np.pi*errs**2))/2 #last term is/would be constant.
   except:
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    print('likelihood exception:')
+    traceback.print_exception(exc_type, exc_value, exc_traceback, file=sys.stdout)
     llike=minlike
   if not llike>minlike:llike=minlike
   #print(llike)
   return llike
 
-def test_roche_lobe(pars,verbose=False):
+    
+
+def test_roche_lobe(pars,Roche_type='L1',verbose=False):
     logM1=pars[0]
     logM2=pars[1]
     M1=10**logM1
@@ -113,11 +265,7 @@ def test_roche_lobe(pars,verbose=False):
     logRadResc2=pars[10]
     Rcoeff = [0.00158766,0.921233,-0.155659,-0.0739842,0.0581150]
     R1=R2=0
-    for j in range(len(Rcoeff)):
-      R1 += Rcoeff[j]*pow(logM1,j)
-      R2 += Rcoeff[j]*pow(logM2,j)
-    R1=10**(R1+logRadResc1)
-    R2=10**(R2+logRadResc2)
+    R1,R2,Teff1,Teff2=calc_radii_and_Teffs(pars[:-1])
     if q<=1:
       Rsec=R2
       Rpri=R1
@@ -130,10 +278,17 @@ def test_roche_lobe(pars,verbose=False):
     #to a reasonable and symmetric result near equal masses.
     #We get the small mass ratio correctly when q is away from 1
     #with a maximum of 1/2 the minumum separation when the q=1
-    Hillfac=((q+2/3+1/q)*3)**(-1/3)
+    if Roche_type=='L1':
+      Hillfac=((q+2/3+1/q)*3)**(-1/3)
+      Hillfac_pri=1-Hillfac
+    elif Roche_type=='Eggleton':
+      Hillfac=0.49/(0.6+q**(-2/3)*np.log(1+q**(1/3)))
+      Hillfac_pri=0.49/(0.6+q**(2/3)*np.log(1+q**(-1/3)))
+    else:
+      raise ValueError('Did not recognize Roche_type="'+str(Roche_type)+'"')
     rperi=a*(1-e)
     aHillsec=rperi*Hillfac
-    aHillpri=rperi*(1-Hillfac)#This is a hack version of the test for the primary.
+    aHillpri=rperi*Hillfac_pri
     if verbose:print('Roche lobe test: Rsec, RHillsec, Rpri, RHillpri, :',Rsec,aHillsec,Rpri,aHillpri)
     test=max([Rsec/aHillsec,Rpri/aHillpri])
     return test
