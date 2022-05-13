@@ -1152,7 +1152,7 @@ void initialize_proposals(double *sigma, double ***history)
 	//jump sizes are set by hand based on what works
 	sigma[0]  = 1.0e-1;  //log M1 (MSUN)
 	sigma[1]  = 1.0e-1;  //log M2 (MSUN)
-	sigma[2]  = 1.0e-5;  //log P (days)
+	sigma[2]  = 1.0e-12;  //log P (days)
 	sigma[3]  = 1.0e-4;  //e
 	sigma[4]  = 1.0e-3;  //inc (rad)
 	sigma[5]  = 1.0e-2;  //Omega (rad)
