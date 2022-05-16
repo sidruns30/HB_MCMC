@@ -526,6 +526,7 @@ Parameters:
 Note that the reflection coefficients are set to 1 for now
 */
 void calc_light_curve(double *times, long Nt, double *pars, double *template){
+
     // Extract the paramters
     double logM1 = pars[0];
     double logM2 = pars[1];

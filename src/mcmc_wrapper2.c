@@ -12,12 +12,14 @@ int main(int argc, char* argv[])
   long iter;
   
   double logLy;
+  double logPy;
   double logLmap; 
   double  *sigma;
   double **x;
   double ***history;
   double xmap[NPARS];  
   double logLx[NCHAINS];
+  double logPx[NCHAINS];
 
   bounds limited[NPARS], limits[NPARS];
   gauss_bounds gauss_pars[NPARS];
@@ -61,15 +63,18 @@ int main(int argc, char* argv[])
   // Miscellaneous
   int run;
   int weight;
-  double ls_period;
+  double log_LC_PERIOD;
   char prefix[100] = "";
   char suffix[100] = "";
   char run_num[15] = "";
 
   NITER = (long)atoi(argv[1]);
   strcpy(RUN_ID,argv[2]);;
-  ls_period = (double)atof(argv[3]);
+  log_LC_PERIOD = (double)atof(argv[3]);
   run = atoi(argv[4]);
+
+
+  const double LC_PERIOD = pow(10., log_LC_PERIOD);
 
   if (ENABLE_OPENMP)
   {
@@ -183,7 +188,7 @@ int main(int argc, char* argv[])
   sigma = (double *)malloc(NPARS*sizeof(double));
 
   // Initialize priors
-  set_limits(limited, limits, gauss_pars);
+  set_limits(limited, limits, gauss_pars, LC_PERIOD);
   
   // Set up proposal distribution
   initialize_proposals(sigma, history);
@@ -199,6 +204,15 @@ int main(int argc, char* argv[])
     {
       fscanf(param_file,"%lf\n", &tmp); 
       printf("Par %d value: %.5e \n",i, tmp);
+
+      if (i == 2) 
+      {
+          tmp = log_LC_PERIOD;  // Keep the period from input
+      }
+      if (i == 7)
+      {
+          tmp = fmod(tmp, LC_PERIOD);
+      }
 
       x[0][i]  = tmp;
       xmap[i]  = tmp;
@@ -223,7 +237,11 @@ int main(int argc, char* argv[])
         x[j][i] = (limits[i].lo + tmp1*(limits[i].hi - limits[i].lo));
         if (i == 2) 
         {
-          x[j][i] = ls_period;  // Keep the period from input
+          x[j][i] = log_LC_PERIOD;  // Keep the period from input
+        }
+        if (i == 7)
+        {
+          x[j][i] = fmod(x[j][i], LC_PERIOD);
         }
       }
     }
@@ -272,7 +290,7 @@ int main(int argc, char* argv[])
   {
     t_data[subi] = rdata[subi*3]; 
     a_data[subi] = rdata[subi*3+1]; 
-    e_data[subi] = 2 * rdata[subi*3+2];
+    e_data[subi] = rdata[subi*3+2];
   }
 
   // Read the magnitude data
@@ -328,12 +346,27 @@ int main(int argc, char* argv[])
   
   printf("initial chi2 and likelihood %lf \t %lf\n",-2*logLmap, logLmap);
 
+  if (STORE_DATA)
+  {
+    // Make chain and Log files
+    printf("Creating chain and log files %s and %s \n", chainname, logLname);
+    chain_file = fopen(chainname,"w");
+    logL_file  = fopen(logLname,"w");
+    logfile    = fopen(logname, "w");
+  }
 
-  // Make chain and Log files
-  printf("Creating chain and log files %s and %s \n", chainname, logLname);
-  chain_file = fopen(chainname,"w");
-  logL_file  = fopen(logLname,"w");
-  logfile    = fopen(logname, "w");
+  FILE *temp_log_files[NCHAINS];
+  char temp_log_fname[NCHAINS][150];
+
+  for (int j=0; j<NCHAINS; j++)
+  {
+      sprintf(temp_log_fname[j], "/scratch/ssolanski/HB_MCMC/debug/temp_%d_log.txt", j);
+      temp_log_files[j] = fopen(temp_log_fname[j], "w");
+      fclose(temp_log_files[j]);
+  }
+
+  // To monitor temperature swaps
+  FILE *temp_swap_file = fopen("/scratch/ssolanski/HB_MCMC/debug/temp_swap_file.txt", "w");
 
   printf("Begining main mcmc loop \n");
   /* Main MCMC Loop*/
@@ -342,7 +375,7 @@ int main(int argc, char* argv[])
 
     int k = iter - (iter / NPAST) * NPAST;
 
-    #pragma omp parallel for schedule(static) if(ENABLE_OPENMP) private(logLy)
+    #pragma omp parallel for schedule(static) if(ENABLE_OPENMP) private(logLy, logPy)
     for(int j=0; j<NCHAINS; j++) 
     {
       // Test parameters
@@ -360,8 +393,6 @@ int main(int argc, char* argv[])
       int chain_id = index[j];
       int jump_type = 0;
 
-      // Gaussian log priors
-      double logPx=0., logPy=0.;
 
       // Take steps in parameter space
       if((ran2_parallel(&seeds[j], &states[j]) < 0.5) && (iter > NPAST)) 
@@ -438,11 +469,14 @@ int main(int argc, char* argv[])
         y[0] = y[1];
       }
 
+      // Fix the period
+      y[2] = log_LC_PERIOD;
+
       // Make the phase modulo period
-      y[7] = fmod(y[7], y[2]);
+      y[7] = fmod(y[7], LC_PERIOD);
 
       // Gaussian priors
-      logPx = get_logP(x[chain_id], limited, limits, gauss_pars);
+      logPx[chain_id] = get_logP(x[chain_id], limited, limits, gauss_pars);
       logPy = get_logP(y, limited, limits, gauss_pars);
 
       //compute current and trial likelihood
@@ -453,17 +487,29 @@ int main(int argc, char* argv[])
       alpha = ran2_parallel(&seeds[j], &states[j]);
 
       //Hasting's ratio
-      double H = exp((logLy-logLx[chain_id])/temp[j]) *  pow(10., logPy - logPx);
+      double H = exp((logLy-logLx[chain_id])/temp[j] + (logPy-logPx[chain_id]));
+
+      // Store the values of parameters in the chains
+      temp_log_files[j] = fopen(temp_log_fname[j], "a");
+
+      for (int i=0; i<NPARS; i++)
+      {
+        // More file printing 
+        fprintf(temp_log_files[j], "%lf\t%lf\t", x[chain_id][i], y[i]);
+      }
 
       //conditional acceptance of y
       if (alpha <= H) 
       {
 
+        // print if the step was accepted
+        fprintf(temp_log_files[j], "%ld\n", jump_type);
+
         // Warn if the best likelihood evaluation looks weird for the 5 coldest chains
         if ( (logLx[chain_id] / logLy <= 0.5)  && (iter > 10000) && (j <= 5))
         {
           LogSuspiciousJumps(logfile, iter, chain_id, H, alpha, temp[j], logLx[chain_id], logLy,
-                             logPx, logPy, x[chain_id], y, jump_type);
+                             logPx[chain_id], logPy, x[chain_id], y, jump_type);
         }
 
 	      if (chain_id == 0) 
@@ -485,6 +531,14 @@ int main(int argc, char* argv[])
 
       }
 
+    else
+      {
+        // Print if the step was accepted or not
+        fprintf(temp_log_files[j], "%ld\n", 0);
+      }
+
+    fclose(temp_log_files[j]);
+
     for(int i=0; i<NPARS; i++) 
     {
       history[j][k][i] = x[chain_id][i];
@@ -504,7 +558,7 @@ int main(int argc, char* argv[])
       acc_arr[i] = 0;
 
       /* parallel tempering */
-      ptmcmc(index, temp, logLx);
+      ptmcmc(index, temp, logLx, logPx, temp_swap_file);
     }
     //update map parameters
     if (logLx[index[0]] > logLmap)
@@ -523,11 +577,19 @@ int main(int argc, char* argv[])
 	    (double)(acc)/((double)atrial),
 	    (double)DEacc/(double)DEtrial);
 	    printf("\n");
+
+      printf("Parameter values: \n");
+      // Print first few parameters
+      for (int i=0; i<5; i++)
+      {
+        printf("%lf\t", x[index[10]][i]);
+      }
+      printf("\n");
     }
 
     atrial++;
 
-    if(iter%1000==0) 
+    if((iter%1000==0) && (STORE_DATA)) 
     {
       //print parameter chains
       fprintf(chain_file,"%ld %.12g ",iter/10,logLx[index[0]]);
@@ -579,33 +641,36 @@ int main(int argc, char* argv[])
     }
   }
 
+  fclose(temp_swap_file);
   /***** MCMC Loop ends *****/
 
-  // Print computed lightcurve
-  data_file = fopen(outname,"w");
-  calc_light_curve(t_data,subN,xmap,a_model);
-  fprintf(data_file,"%ld\n",subN);
-
-  for (int i=0;i<subN;i++) 
+  if (STORE_DATA)
   {
-    fprintf(data_file,"%12.5e %12.5e %12.5e\n",t_data[i],a_data[i],a_model[i]);
+    // Print computed lightcurve
+    data_file = fopen(outname,"w");
+    calc_light_curve(t_data,subN,xmap,a_model);
+    fprintf(data_file,"%ld\n",subN);
+
+    for (int i=0;i<subN;i++) 
+    {
+      fprintf(data_file,"%12.5e %12.5e %12.5e\n",t_data[i],a_data[i],a_model[i]);
+    }
+
+    // Print best parameters
+    param_file = fopen(parname,"w");
+    for (int z=0; z<NPARS; z++)
+    {
+      fprintf(param_file, "%12.5e ", x[index[0]][z]);
+    }
+
+    fprintf(param_file,"\n");
+
+    fclose(logfile);
+    fclose(data_file);  
+    fclose(param_file);
+    fclose(chain_file);
+    fclose(logL_file);
   }
-
-  // Print best parameters
-  param_file = fopen(parname,"w");
-  for (int z=0; z<NPARS; z++)
-  {
-    fprintf(param_file, "%12.5e ", x[index[0]][z]);
-  }
-
-  fprintf(param_file,"\n");
-
-  
-  fclose(logfile);
-  fclose(data_file);  
-  fclose(param_file);
-  fclose(chain_file);
-  fclose(logL_file);
 
   // Free the memory from arrays
   free_2d(x, NCHAINS);
@@ -632,22 +697,25 @@ double get_logP(double pars[], bounds limited[], bounds limits[], gauss_bounds g
     if (gauss_pars[i].flag == 1)
     {
       mean = 0.5 * (limits[i].lo + limits[i].hi);
-      sigma = (limits[i].hi - limits[i].lo) / 2.;
-      logP += log10(gaussian(pars[i], mean, sigma));
+      sigma = (limits[i].hi - limits[i].lo) / 3.;
+      logP += log(gaussian(pars[i], mean, sigma));
     }
   }
   return logP;
 }
 
 
-void ptmcmc(int *index, double temp[], double logL[])
+void ptmcmc(int *index, double temp[], double logL[], double logP[], FILE *temp_swap_file)
 {
   int a, b;
 	int olda, oldb;
 	
 	double heat1, heat2;
 	double logL1, logL2;
+  double logP1, logP2;
 	double dlogL;
+  double dlogP;
+  double dlogE;
 	double H;
 	double alpha;
 	double beta;
@@ -674,7 +742,10 @@ void ptmcmc(int *index, double temp[], double logL[])
 	heat2 = temp[b];
 	logL1 = logL[olda];
 	logL2 = logL[oldb];
+  logP1 = logP[olda];
+  logP2 = logP[oldb];
 	dlogL = logL2 - logL1;
+  dlogP = logP1 - logP2;
 	H  = (heat2 - heat1)/(heat2*heat1);
 	alpha = exp(dlogL*H);
 	beta  = ((double)rand()/(RAND_MAX));
@@ -682,6 +753,7 @@ void ptmcmc(int *index, double temp[], double logL[])
 	{
 		index[a] = oldb;
 		index[b] = olda;
+    fprintf(temp_swap_file, "%d\t%d\n", a, b);
 	}
 }
 
@@ -1005,7 +1077,7 @@ void differential_evolution_proposal_parallel(double *x, long *seed, double **hi
 
 /* Set priors on parameters, and whether or not each parameter is bounded*/
 /* Siddhant: Maybe just use an if condition/switch statment instead of limited*/
-void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[])
+void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[], double LC_PERIOD)
 {
   //limits on M1, in log10 MSUN
   limited[0].lo = 1; 
@@ -1051,9 +1123,9 @@ void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[])
   gauss_pars[6].flag = 0;
   //limits on T0, in MDJ-2450000
   limited[7].lo = 1;
-  limits[7].lo = -1000;
+  limits[7].lo = 0.;
   limited[7].hi = 1;
-  limits[7].hi = 1000.;
+  limits[7].hi = LC_PERIOD;
   gauss_pars[7].flag = 0;
   //limits on log rr1, the scale factor for R1
   limited[8].lo = 1;
@@ -1164,24 +1236,24 @@ void initialize_proposals(double *sigma, double ***history)
 	sigma[0]  = 1.0e-1;  //log M1 (MSUN)
 	sigma[1]  = 1.0e-1;  //log M2 (MSUN)
 	sigma[2]  = 1.0e-8;  //log P (days)
-	sigma[3]  = 1.0e-4;  //e
+	sigma[3]  = 1.0e-2;  //e
 	sigma[4]  = 1.0e-3;  //inc (rad)
-	sigma[5]  = 1.0e-2;  //Omega (rad)
+	sigma[5]  = 1.0e-3;  //Omega (rad)
 	sigma[6]  = 1.0e-3;  //omega0 (rad)
 	sigma[7]  = 1.0e-3;  //T0 (day)
 	sigma[8]  = 1.0e-2;  //log rr1 normalization
 	sigma[9]  = 1.0e-2;  //log rr2 normalization
-  sigma[10] = 1.0e-3;   // mu 1
-  sigma[11] = 1.0e-3;   // tau 1
-  sigma[12] = 1.0e-3;   // mu 2
-  sigma[13] = 1.0e-3;   // tau 2
+  sigma[10] = 1.0e-2;   // mu 1
+  sigma[11] = 1.0e-2;   // tau 1
+  sigma[12] = 1.0e-2;   // mu 2
+  sigma[13] = 1.0e-2;   // tau 2
   sigma[14] = 1.0e-2;   // ref 1
   sigma[15] = 1.0e-2;   // ref 2
-  sigma[16] = 1.0e-3;   // extra alph 1
-  sigma[17] = 1.0e-3;   // extra alph 2
+  sigma[16] = 1.0e-2;   // extra alph 1
+  sigma[17] = 1.0e-2;   // extra alph 2
   sigma[18] = 1.0e-2;   // temp 1
   sigma[19] = 1.0e-2;   // temp 2
-  sigma[20] = 1.0e-2;   // blending
+  sigma[20] = 1.0e-3;   // blending
   sigma[21] = 1.0e-5;   // flux tune
 	//if (burn_in == 0) for(i=0; i<NPARS; i++) sigma[i] /= 100;
 	
