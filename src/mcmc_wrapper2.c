@@ -326,7 +326,7 @@ int main(int argc, char* argv[])
   }
 
   // Initialize parallel tempering
-  dtemp = 1.3;
+  dtemp = 1.4;
   temp[0] = 1.0;
   index[0] = 0;
   
@@ -363,6 +363,9 @@ int main(int argc, char* argv[])
       sprintf(temp_log_fname[j], "/scratch/ssolanski/HB_MCMC/debug/temp_%d_log.txt", j);
       temp_log_files[j] = fopen(temp_log_fname[j], "w");
       fclose(temp_log_files[j]);
+
+      // Store the values of parameters in the chains
+      temp_log_files[j] = fopen(temp_log_fname[j], "a");
   }
 
   // To monitor temperature swaps
@@ -489,21 +492,19 @@ int main(int argc, char* argv[])
       //Hasting's ratio
       double H = exp((logLy-logLx[chain_id])/temp[j] + (logPy-logPx[chain_id]));
 
-      // Store the values of parameters in the chains
-      temp_log_files[j] = fopen(temp_log_fname[j], "a");
-
-      for (int i=0; i<NPARS; i++)
-      {
+      //
+      //for (int i=0; i<NPARS; i++)
+      //{
         // More file printing 
-        fprintf(temp_log_files[j], "%lf\t%lf\t", x[chain_id][i], y[i]);
-      }
+      //  fprintf(temp_log_files[j], "%lf\t%lf\t", x[chain_id][i], y[i]);
+      //}
 
       //conditional acceptance of y
       if (alpha <= H) 
       {
 
         // print if the step was accepted
-        fprintf(temp_log_files[j], "%ld\n", jump_type);
+        //fprintf(temp_log_files[j], "%ld\n", jump_type);
 
         // Warn if the best likelihood evaluation looks weird for the 5 coldest chains
         if ( (logLx[chain_id] / logLy <= 0.5)  && (iter > 10000) && (j <= 5))
@@ -531,13 +532,11 @@ int main(int argc, char* argv[])
 
       }
 
-    else
-      {
+    //else
+    //  {
         // Print if the step was accepted or not
-        fprintf(temp_log_files[j], "%ld\n", 0);
-      }
-
-    fclose(temp_log_files[j]);
+        //fprintf(temp_log_files[j], "%ld\n", 0);
+    //  }
 
     for(int i=0; i<NPARS; i++) 
     {
@@ -607,6 +606,13 @@ int main(int argc, char* argv[])
       for(int i=0; i<NCHAINS; i++)
       {
         fprintf(logL_file,"%.12g ",logLx[index[i]]);
+        
+        for(int j=0; j<NPARS; j++)
+        {
+          fprintf(temp_log_files[i], "%lf\t", x[index[i]][j]);
+        }
+        
+        fprintf(temp_log_files[i], "\n");
       }
 
       fprintf(logL_file,"\n");
@@ -670,6 +676,11 @@ int main(int argc, char* argv[])
     fclose(param_file);
     fclose(chain_file);
     fclose(logL_file);
+  }
+
+  for (int j=0; j<NCHAINS; j++)
+  {
+    fclose(temp_log_files[j]);
   }
 
   // Free the memory from arrays
@@ -753,7 +764,6 @@ void ptmcmc(int *index, double temp[], double logL[], double logP[], FILE *temp_
 	{
 		index[a] = oldb;
 		index[b] = olda;
-    fprintf(temp_swap_file, "%d\t%d\n", a, b);
 	}
 }
 
@@ -1036,10 +1046,13 @@ void differential_evolution_proposal_parallel(double *x, long *seed, double **hi
     int n;
     int a;
     int b;
+    int c;
     double dx[NPARS];
+    double epsilon[NPARS];
     
     //choose two samples from chain history
     a = ran2_parallel(seed, state)*NPAST;
+    a = ran2_parallel(seed, state);
     b = a;
     while(b==a) 
     {
@@ -1050,6 +1063,7 @@ void differential_evolution_proposal_parallel(double *x, long *seed, double **hi
     for(n=0; n<NPARS; n++) 
     {
       dx[n] = history[b][n] - history[a][n];
+      epsilon[n] = dx[n] * (gaussian(c, 0, 1.e-4) - 0.5);
     }
     //Blocks?
     
@@ -1065,6 +1079,7 @@ void differential_evolution_proposal_parallel(double *x, long *seed, double **hi
     //jump along vector w/ appropriate scaling
     for(n=0; n<NPARS; n++) 
     {
+      dx[n] += epsilon[n];
       y[n] = x[n] + dx[n];
     }
   }
@@ -1225,7 +1240,6 @@ void initialize_proposals(double *sigma, double ***history)
 	int n,i,j;
 	double junk;
 	double x[NPARS];
-	FILE *hfile;
 	
 	
 	/*********************/    
@@ -1233,16 +1247,16 @@ void initialize_proposals(double *sigma, double ***history)
 	/*********************/    
 	
 	//jump sizes are set by hand based on what works
-	sigma[0]  = 1.0e-1;  //log M1 (MSUN)
-	sigma[1]  = 1.0e-1;  //log M2 (MSUN)
+	sigma[0]  = 1.0e-2;  //log M1 (MSUN)
+	sigma[1]  = 1.0e-2;  //log M2 (MSUN)
 	sigma[2]  = 1.0e-8;  //log P (days)
 	sigma[3]  = 1.0e-2;  //e
 	sigma[4]  = 1.0e-3;  //inc (rad)
 	sigma[5]  = 1.0e-3;  //Omega (rad)
 	sigma[6]  = 1.0e-3;  //omega0 (rad)
-	sigma[7]  = 1.0e-3;  //T0 (day)
-	sigma[8]  = 1.0e-2;  //log rr1 normalization
-	sigma[9]  = 1.0e-2;  //log rr2 normalization
+	sigma[7]  = 1.0e-5;  //T0 (day)
+	sigma[8]  = 1.0e-1;  //log rr1 normalization
+	sigma[9]  = 1.0e-1;  //log rr2 normalization
   sigma[10] = 1.0e-2;   // mu 1
   sigma[11] = 1.0e-2;   // tau 1
   sigma[12] = 1.0e-2;   // mu 2
@@ -1251,8 +1265,8 @@ void initialize_proposals(double *sigma, double ***history)
   sigma[15] = 1.0e-2;   // ref 2
   sigma[16] = 1.0e-2;   // extra alph 1
   sigma[17] = 1.0e-2;   // extra alph 2
-  sigma[18] = 1.0e-2;   // temp 1
-  sigma[19] = 1.0e-2;   // temp 2
+  sigma[18] = 1.0e-1;   // temp 1
+  sigma[19] = 1.0e-1;   // temp 2
   sigma[20] = 1.0e-3;   // blending
   sigma[21] = 1.0e-5;   // flux tune
 	//if (burn_in == 0) for(i=0; i<NPARS; i++) sigma[i] /= 100;

@@ -12,10 +12,10 @@
 #define NPAST   500
 #define GAMMA (2.388/sqrt(2.*NPARS))
 #define NUM_ELEMENTS(x) (size_of(x)/size_of(x[0]))
-#define USE_RAND_PARS 0
-#define USE_COLOR_INFO 1
+#define USE_RAND_PARS 1
+#define USE_COLOR_INFO 0
 #define ENABLE_OPENMP 1
-#define STORE_DATA 0
+#define STORE_DATA 1
 
 /* From likelihood.c */
 void calc_light_curve(double t_data[], long Nt, double P_[], double light_curve[]);
