@@ -527,15 +527,6 @@ Note that the reflection coefficients are set to 1 for now
 */
 void calc_light_curve(double *times, long Nt, double *pars, double *template){
 
-    // Order the masses
-    if (pars[1]> pars[0])
-    {
-        swap(&pars[1], &pars[0]);
-    }
-
-    // Force T0 to be modulo the period
-    pars[7] = fmod(pars[7], pars[2]);
-
     // Extract the paramters
     double logM1 = pars[0];
     double logM2 = pars[1];
