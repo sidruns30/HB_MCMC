@@ -29,20 +29,20 @@
 #define QUAD(x) ((x)*(x)*(x)*(x))
 
 
-struct bounds
+struct bounds_old
 {
   double lo;
   double hi;
 };
 
-struct gauss_bounds
+struct gauss_bounds_old
 {
   int flag;
 };
 
 #define NTAB 32
 // structure to hold random number values
-struct RNG_Vars
+struct RNG_Vars_old
 {
   long idum2; // some seed
   long iy;
@@ -54,27 +54,28 @@ struct RNG_Vars
 };
 
 
-typedef struct bounds bounds;
-typedef struct gauss_bounds gauss_bounds;
-typedef struct RNG_Vars RNG_Vars;
+typedef struct bounds_old bounds_old;
+typedef struct gauss_bounds_old gauss_bounds_old;
+typedef struct RNG_Vars_old RNG_Vars_old;
 
-double partition (double arr[], int low, int high);
-void quickSort(double arr[], int low, int high);
-void remove_median(double *arr, long begin, long end);
-void traj(double *times, double *traj_pars, double *d_arr, 
-        double *Z1_arr, double *Z2_arr, double *rr_arr, double *ff_arr, int Nt);
-double get_alpha_beam(double logT);
-double beaming(double P, double M1, double M2, double e, double inc,
+double partition_old(double arr[], int low, int high);
+void quickSort_old(double arr[], int low, int high);
+void remove_median_old(double *arr, long begin, long end);
+void traj_old(double t, double pars[], int i, double *X1, double *X2, double *Y1, double *Y2,
+        double *Z1, double *Z2, double *rr, double *ff);
+double get_alpha_beam_old(double logT);
+double beaming_old(double P, double M1, double M2, double e, double inc,
                 double omega0, double nu, double alpha_beam);
-double ellipsoidal(double P, double M1, double M2, double e, double inc,
+double ellipsoidal_old(double P, double M1, double M2, double e, double inc,
                 double omega0, double nu, double R1, double a, double mu, double tau);
-double reflection(double P, double M1, double M2, double e, double inc, 
+double reflection_old(double P, double M1, double M2, double e, double inc, 
                     double omega0, double nu , double R2, double alpha_ref1);
-double eclipse_area(double R1, double R2, double d);
-void calc_mags(double params[],  double D, double *Gmg, double *BminusV, 
+double eclipse_area_old(double R1, double R2, 
+                double X1, double X2, double Y1, double Y2);
+void calc_mags_old(double params[],  double D, double *Gmg, double *BminusV, 
 double *VminusG, double *GminusT);
-void calc_light_curve(double *times, long Nt, double *pars,  double *template);
-int RocheOverflow(double *pars);
-double loglikelihood(double time[], double lightcurve[], double noise[],
+void calc_light_curve_old(double *times, long Nt, double *pars,  double *template);
+int RocheOverflow_old(double *pars);
+double loglikelihood_old(double time[], double lightcurve[], double noise[],
 		     long N, double params[], double mag_data[], double magerr[], 
           int weight);

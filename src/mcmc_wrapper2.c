@@ -325,6 +325,7 @@ int main(int argc, char* argv[])
     } 
   }
 
+  printf("Test 1 \n");
   // Initialize parallel tempering
   dtemp = 1.4;
   temp[0] = 1.0;
@@ -336,6 +337,7 @@ int main(int argc, char* argv[])
     index[i] = i;
   }
 
+  printf("Test 2 \n");
   // Perform first likelihood evaluation
   logLmap = loglikelihood(t_data,a_data,e_data,subN, x[0], mag_data, mag_err, weight);
   
@@ -1269,6 +1271,17 @@ void initialize_proposals(double *sigma, double ***history)
   sigma[19] = 1.0e-1;   // temp 2
   sigma[20] = 1.0e-3;   // blending
   sigma[21] = 1.0e-5;   // flux tune
+  
+  // Use bigger sigmas if not using color info
+  if (!USE_COLOR_INFO)
+  {
+    sigma[0] = 1.e-1;   //log M1
+    sigma[1] = 1.e-1;   //log M2
+    sigma[4] = 1.e-1;   //inc (rad)
+    sigma[6] = 1.e-1;   //omega (rad)
+    sigma[7] = 1.e-2;   //T0 (day)
+  }
+
 	//if (burn_in == 0) for(i=0; i<NPARS; i++) sigma[i] /= 100;
 	
 	//for(i=0; i<NPARS; i++) sigma[i] /= ((double)(NPARS));
