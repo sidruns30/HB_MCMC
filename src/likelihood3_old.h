@@ -1,33 +1,39 @@
-#define PI 3.14159265358979323846
-#define G 6.6743e-8 //cgs
-#define C 2.998e10
-#define AU 1.496e13
-#define MSUN 1.9885e33
-#define RSUN 6.955e10
-#define SEC_DAY 86400.0
-#define ALPHA_FREE 1 // to set coefficitents as parameters in the model
-#define ALPHA_MORE 1 // to add even more flexible coefficients
-#define BLENDING 1 // Blending fraction (currently only works when alpha free and alpha more are enabled)
-#if ALPHA_FREE == 1
-  #if ALPHA_MORE == 1
-    #if BLENDING == 1
-        #define NPARS 22
+#ifndef LKL3_H
+
+  #define LKL3_H 123456789
+  #define PI 3.14159265358979323846
+  #define G 6.6743e-8 //cgs
+  #define C 2.998e10
+  #define AU 1.496e13
+  #define MSUN 1.9885e33
+  #define RSUN 6.955e10
+  #define SEC_DAY 86400.0
+  #define USE_COLOR_INFO 0
+  #define STORE_DATA 1
+  #define ALPHA_FREE 1 // to set coefficitents as parameters in the model
+  #define ALPHA_MORE 1 // to add even more flexible coefficients
+  #define BLENDING 1 // Blending fraction (currently only works when alpha free and alpha more are enabled)
+  #if ALPHA_FREE == 1
+    #if ALPHA_MORE == 1
+      #if BLENDING == 1
+          #define NPARS 22
+      #else
+          #define NPARS 20
+      #endif
     #else
-        #define NPARS 20
+      #define NPARS 16
     #endif
   #else
-    #define NPARS 16
+      #define NPARS 10
   #endif
-#else
-    #define NPARS 10
-#endif
-#define SAVECOMP 0 // Save the individual lightcurve components in the txt file
-#define BIG_NUM 1.e15
+  #define SAVECOMP 0 // Save the individual lightcurve components in the txt file
+  #define BIG_NUM 1.e15
 
-#define SQR(x) ((x)*(x))
-#define CUBE(x) ((x)*(x)*(x))
-#define QUAD(x) ((x)*(x)*(x)*(x))
+  #define SQR(x) ((x)*(x))
+  #define CUBE(x) ((x)*(x)*(x))
+  #define QUAD(x) ((x)*(x)*(x)*(x))
 
+#endif // LKL3_H
 
 struct bounds_old
 {
@@ -79,3 +85,4 @@ int RocheOverflow_old(double *pars);
 double loglikelihood_old(double time[], double lightcurve[], double noise[],
 		     long N, double params[], double mag_data[], double magerr[], 
           int weight);
+void set_limits_old(bounds_old limited[], bounds_old limits[], gauss_bounds_old gauss_pars[], double LC_PERIOD);

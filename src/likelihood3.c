@@ -537,11 +537,10 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     double Pdays = pow(10., pars[2]);
     double e = pars[3];
     double inc = pars[4];
-    double Omega = pars[5];
-    double omega0 = pars[6];
-    double T0 = pars[7]*SEC_DAY;
-    double rr1 = pars[8];
-    double rr2 = pars[9];
+    double omega0 = pars[5];
+    double T0 = pars[6]*SEC_DAY;
+    double rr1 = pars[7];
+    double rr2 = pars[8];
     double alpha_Teff_1 = 0.;
     double alpha_Teff_2 = 0.;
     
@@ -558,24 +557,24 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     if (ALPHA_FREE == 1)
     {
         // Limb and gravity darkening coefficients respectively
-        mu_1 = pars[10];
-        tau_1 = pars[11];
-        mu_2 = pars[12];
-        tau_2 = pars[13];
+        mu_1 = pars[9];
+        tau_1 = pars[10];
+        mu_2 = pars[11];
+        tau_2 = pars[12];
         // Reflection coefficients
-        alpha_ref_1 = pars[14];
-        alpha_ref_2 = pars[15];
+        alpha_ref_1 = pars[13];
+        alpha_ref_2 = pars[14];
 	if (ALPHA_MORE ==1)
     {
 	  //extra alphas
-	  extra_alpha_beam_1 = exp(pars[16]);//pow(10., pars[16]);
-	  extra_alpha_beam_2 = exp(pars[17]);//pow(10., pars[17]);
-	  alpha_Teff_1 = pars[18];//pow(10., pars[18]);
-	  alpha_Teff_2 = pars[19];//pow(10., pars[19]);
+	  extra_alpha_beam_1 = exp(pars[15]);//pow(10., pars[16]);
+	  extra_alpha_beam_2 = exp(pars[16]);//pow(10., pars[17]);
+	  alpha_Teff_1 = pars[17];//pow(10., pars[18]);
+	  alpha_Teff_2 = pars[18];//pow(10., pars[19]);
 
         if (BLENDING == 1){
-        blending = pars[20];
-        flux_tune = pars[21];
+        blending = pars[19];
+        flux_tune = pars[20];
         }
 	}
 
@@ -607,11 +606,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     // Compute effective temperature and radius 
     double R1 = 0., R2 = 0., Teff1 = 0., Teff2 = 0.;
 
-    R1 = pow(10., _getR(logM1) + rr1*envelope_Radius(logM1)); 
-    R2 = pow(10., _getR(logM2) + rr2*envelope_Radius(logM2)); 
-
-    Teff1 = pow(10., _getT(logM1) + alpha_Teff_1*envelope_Temp(logM1));
-    Teff2 = pow(10., _getT(logM2) + alpha_Teff_2*envelope_Temp(logM2));
+    calc_radii_and_Teffs(pars, &R1, &R2, &Teff1, &Teff2);
 
     // Flux normalization coefficients
     double Norm1, Norm2;
@@ -700,14 +695,14 @@ void calc_radii_and_Teffs(double params[],  double *R1, double *R2, double *Teff
     // Compute effective temperature and radius 
     double logM1 = params[0];
     double logM2 = params[1];
-    double rr1 = params[8];
-    double rr2 = params[9];
+    double rr1 = params[7];
+    double rr2 = params[8];
     double alpha_Teff_1 = 0.;
     double alpha_Teff_2 = 0.;
     if (ALPHA_MORE)
     {
-        alpha_Teff_1 = params[18];
-        alpha_Teff_2 = params[19];
+        alpha_Teff_1 = params[17];
+        alpha_Teff_2 = params[18];
     }
 
     *R1 = pow(10., _getR(logM1) + rr1*envelope_Radius(logM1)); 
@@ -734,16 +729,16 @@ double *VminusG, double *GminusT)
     double logM1 = params[0];
     double logM2 = params[1];
 
-    double rr1 = params[8];
-    double rr2 = params[9];
+    double rr1 = params[7];
+    double rr2 = params[8];
 
     double alpha_Teff_1 = 0.;
     double alpha_Teff_2 = 0.;
 
     if (ALPHA_MORE)
     {
-        alpha_Teff_1 = params[18];
-        alpha_Teff_2 = params[19];
+        alpha_Teff_1 = params[17];
+        alpha_Teff_2 = params[18];
     }
 
     // Calculate R1, R2, T1, T2 from the parameters
@@ -772,7 +767,7 @@ double *VminusG, double *GminusT)
 
   if (ALPHA_MORE && BLENDING)
   {
-    blending = params[20];
+    blending = params[19];
   }
   for (j=0;j<4;j++) {
     nu[j]=C/(lam[j]*1e-7);
@@ -845,8 +840,6 @@ double loglikelihood(double time[], double lightcurve[], double noise[],
     
     calc_mags(params, D, &Gmg, &BminusV, &VminusG, &GminusT);
     double computed_mags[4] = {Gmg, BminusV, VminusG, GminusT};
-    //printf("D, G, B-V, V-G, G-T:%f %f %f %f %f\n", magerr[0], magerr[1],mag_data[2],mag_data[3],mag_data[4]);
-    //printf("G, B-V, V-G, G-T:%f %f %f %f \n", Gmg, BminusV, VminusG, GminusT);
     
     for (i=0;i<4;i++)
     {
@@ -954,8 +947,8 @@ int RocheOverflow(double *pars)
     double q = M1 / M2;
     double period = pow(10., pars[2]) * SEC_DAY;
     double ecc = pars[3];
-    double R1 = pow(10., _getR(pars[0]) + pars[8]*envelope_Radius(pars[0])) * RSUN; 
-    double R2 = pow(10., _getR(pars[1]) + pars[9]*envelope_Radius(pars[1])) * RSUN; 
+    double R1 = pow(10., _getR(pars[0]) + pars[7]*envelope_Radius(pars[0])) * RSUN; 
+    double R2 = pow(10., _getR(pars[1]) + pars[8]*envelope_Radius(pars[1])) * RSUN; 
     double Bin_Sep = pow(G * (M1 + M2) * SQR(period) / (4.0*PI*PI), 1./3.);
     // The factor after comes from assuming eccentric orbits
     double RL1_over_sep = Eggleton_RL(q);
@@ -977,6 +970,235 @@ struct InputPars
     int flag;
 
 };
+
+/* Set priors on parameters, and whether or not each parameter is bounded*/
+/* Siddhant: Maybe just use an if condition/switch statment instead of limited*/
+void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[], double LC_PERIOD)
+{
+  //limits on M1, in log10 MSUN
+  limited[0].lo = 1; 
+  limits[0].lo = -1.5;
+  limited[0].hi = 1;
+  limits[0].hi = 2.0;
+  gauss_pars[0].flag = 0;
+  //limits on M2, in log10 MSUN
+  limited[1].lo = 1;
+  limits[1].lo = -1.5;
+  limited[1].hi = 1;
+  limits[1].hi = 2.0;
+  gauss_pars[1].flag = 0;
+  //limits on P, in log10 days
+  limited[2].lo = 1;
+  limits[2].lo = -2.0;
+  limited[2].hi = 1;
+  limits[2].hi = 3.0;
+  gauss_pars[2].flag = 0;
+  //limits on e
+  limited[3].lo = 1;
+  limits[3].lo = 0.0;
+  limited[3].hi = 1;
+  limits[3].hi = 1;
+  gauss_pars[3].flag = 0;
+  //limits on inc, in rads
+  limited[4].lo = 1;
+  limits[4].lo = 0;
+  limited[4].hi = 1;
+  limits[4].hi = PI/2;
+  gauss_pars[4].flag = 0;
+  //limits on omega0, in rads
+  limited[5].lo = 2;
+  limits[5].lo = -PI;
+  limited[5].hi = 2;
+  limits[5].hi = PI;
+  gauss_pars[5].flag = 0;
+  //limits on T0, in MDJ-2450000
+  limited[6].lo = 1;
+  limits[6].lo = 0.;
+  limited[6].hi = 1;
+  limits[6].hi = LC_PERIOD;
+  gauss_pars[6].flag = 0;
+  //limits on log rr1, the scale factor for R1
+  limited[7].lo = 1;
+  limits[7].lo = -3.;
+  limited[7].hi = 1;
+  limits[7].hi = 3.;
+  gauss_pars[7].flag = 1.;
+  //limits on log rr2, the scale factor for R2
+  limited[8].lo = 1;
+  limits[8].lo = -3.;
+  limited[8].hi = 1;
+  limits[8].hi = 3.;
+  gauss_pars[8].flag = 1.;
+  if (ALPHA_FREE == 1){
+    // Limits of the alpha_coefficients
+    // limits on limb darkening coefficient for star 1
+    limited[9].lo = 1;
+    limits[9].lo = 0.12;
+    limited[9].hi = 1;
+    limits[9].hi = 0.20;
+    gauss_pars[9].flag = 1;
+    // limits on gravity darkening coefficient for star 1
+    limited[10].lo = 1;
+    limits[10].lo = 0.3;
+    limited[10].hi = 1;
+    limits[10].hi = 0.38;
+    gauss_pars[10].flag = 1;
+    // limits on limb darkening coefficient for star 2
+    limited[11].lo = 1;
+    limits[11].lo = 0.12;
+    limited[11].hi = 1;
+    limits[11].hi = 0.20;
+    gauss_pars[11].flag = 1;
+    // limits on gravity darkening coefficient for star 2
+    limited[12].lo = 1;
+    limits[12].lo = 0.3;
+    limited[12].hi = 1;
+    limits[12].hi = 0.38;
+    gauss_pars[12].flag = 1;
+    // limits on reflection coefficients on star 1
+    limited[13].lo = 1;
+    limits[13].lo = 0.8;
+    limited[13].hi = 1;
+    limits[13].hi = 1.2;
+    gauss_pars[13].flag = 1;
+    // limits on reflection coefficients on star 2
+    limited[14].lo = 1;
+    limits[14].lo = 0.8;
+    limited[14].hi = 1;
+    limits[14].hi = 1.2;
+    gauss_pars[14].flag = 1;
+    if (ALPHA_MORE == 1){
+      // limits on extra (log) beaming coefficient for star 1
+      limited[15].lo = 1;
+      limits[15].lo = -0.1;
+      limited[15].hi = 1;
+      limits[15].hi = 0.1;
+      gauss_pars[15].flag = 1;
+      // limits on extra (log) beaming coefficient for star 2
+      limited[16].lo = 1;
+      limits[16].lo = -0.1;
+      limited[16].hi = 1;
+      limits[16].hi = 0.1;
+      gauss_pars[16].flag = 1;
+      // limits on (log) Teff coefficient for star 1
+      limited[17].lo = 1;
+      limits[17].lo = -3.;
+      limited[17].hi = 1;
+      limits[17].hi = 3.;
+      gauss_pars[17].flag = 1.;
+      // limits on (log) Teff coefficient for star 2
+      limited[18].lo = 1;
+      limits[18].lo = -3.;
+      limited[18].hi = 1;
+      limits[18].hi = 3.;
+      gauss_pars[18].flag = 1.;
+      if (BLENDING == 1){
+        // Blending coefficient in the flux
+        limited[19].lo = 1;
+        limits[19].lo = 0.;
+        limited[19].hi = 1;
+        limits[19].hi = 1.;
+        gauss_pars[19].flag = 0;
+        // FLux tune coefficient
+        limited[20].lo = 1;
+        limits[20].lo = 0.99;
+        limited[20].hi = 1;
+        limits[20].hi = 1.01;
+        gauss_pars[20].flag = 0;
+      }
+    }
+  }
+}
+
+void initialize_proposals(double *sigma, double ***history)
+{
+	int n,i,j;
+	double junk;
+	double x[NPARS];
+	
+	
+	/*********************/    
+	/* Gaussian Proposal */
+	/*********************/    
+	
+	//jump sizes are set by hand based on what works
+	sigma[0]  = 1.0e-2;  //log M1 (MSUN)
+	sigma[1]  = 1.0e-2;  //log M2 (MSUN)
+	sigma[2]  = 1.0e-8;  //log P (days)
+	sigma[3]  = 1.0e-2;  //e
+	sigma[4]  = 1.0e-3;  //inc (rad)
+	sigma[5]  = 1.0e-3;  //omega0 (rad)
+	sigma[6]  = 1.0e-5;  //T0 (day)
+	sigma[7]  = 1.0e-1;  //log rr1 normalization
+	sigma[8]  = 1.0e-1;  //log rr2 normalization
+  sigma[9] = 1.0e-2;   // mu 1
+  sigma[10] = 1.0e-2;   // tau 1
+  sigma[11] = 1.0e-2;   // mu 2
+  sigma[12] = 1.0e-2;   // tau 2
+  sigma[13] = 1.0e-2;   // ref 1
+  sigma[14] = 1.0e-2;   // ref 2
+  sigma[15] = 1.0e-2;   // extra alph 1
+  sigma[16] = 1.0e-2;   // extra alph 2
+  sigma[17] = 1.0e-1;   // temp 1
+  sigma[18] = 1.0e-1;   // temp 2
+  sigma[19] = 1.0e-3;   // blending
+  sigma[20] = 1.0e-5;   // flux tune
+  
+  // Use bigger sigmas if not using color info
+  if (!USE_COLOR_INFO)
+  {
+      for (int k=0; k<NPARS; k++)
+      {
+          sigma[0] = 1.e-1; // logM1
+          sigma[1] = 1.e-1; // logM2
+          sigma[4] = 1.e-2; // inc
+          sigma[5] = 1.e-2; // omega0
+          sigma[6] = 1.e-3; // T0
+          sigma[9] = 1.e-1; // mu 1
+          sigma[10] = 1.e-1; // tau 1
+          sigma[11] = 1.e-1; // mu 2
+          sigma[12] = 1.e-1; // tau 2
+          sigma[13] = 1.e-1; // ref 1
+          sigma[14] = 1.e-1; // ref 2
+          sigma[15] = 1.e-1; // extra alpha 1
+          sigma[16] = 1.e-1; // extra alpha 2
+          sigma[17] = 1.e-1; // temp 1
+          sigma[18] = 1.e-1; // temp 2
+
+      }
+  }
+
+	//if (burn_in == 0) for(i=0; i<NPARS; i++) sigma[i] /= 100;
+	
+	//for(i=0; i<NPARS; i++) sigma[i] /= ((double)(NPARS));
+		
+	
+	/**********************/    
+	/* Hypercube Proposal */
+	/**********************/    
+	//use sigma to set bin size?
+		
+		
+	/**************************/    
+	/* Differential Evolution */
+	/**************************/    
+		/*
+	//read initial "history" samples from saved chain	
+	hfile = fopen("history.dat","r");
+	
+	for(i=0; i<NPAST; i++)
+	{
+		//read in parameter from history file
+		fscanf(hfile,"%i %lg",&n,&junk);
+		for(n=0; n<NPARS; n++)fscanf(hfile,"%lg",&x[n]);
+		
+		//copy parameters across all chains
+		for(j=0; j<NCHAINS; j++) for(n=0; j<NPARS; n++) history[j][i][n] = x[n];
+	}
+	
+	fclose(hfile);
+		 */
+}
 
 //Leave commented out unless for debugging purposes
 
@@ -1009,7 +1231,7 @@ int main()
         more_pars[14] =           0.5;    /*ref 1
         more_pars[15] =           0.5;    /*ref 2
         more_pars[16] =           0.;     /*beam 1
-        more_pars[17] =           0.;     /*beam 2
+        more_pars[17] =           0.;     /*beam ]
         more_pars[18] =           0.;   /*Teff 1
         more_pars[19] =           0.;  /*Teff 2
         more_pars[20] =           0.2 + 2*((double)rand()/RAND_MAX - 0.5) * .2; /*blending  uniform between 0 and 0.4 

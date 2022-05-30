@@ -1084,6 +1084,151 @@ struct InputPars
 
 };
 
+/* Set priors on parameters, and whether or not each parameter is bounded*/
+/* Siddhant: Maybe just use an if condition/switch statment instead of limited*/
+void set_limits_old(bounds_old limited[], bounds_old limits[], gauss_bounds_old gauss_pars[], double LC_PERIOD)
+{
+  //limits on M1, in log10 MSUN
+  limited[0].lo = 1; 
+  limits[0].lo = -1.5;
+  limited[0].hi = 1;
+  limits[0].hi = 2.0;
+  gauss_pars[0].flag = 0;
+  //limits on M2, in log10 MSUN
+  limited[1].lo = 1;
+  limits[1].lo = -1.5;
+  limited[1].hi = 1;
+  limits[1].hi = 2.0;
+  gauss_pars[1].flag = 0;
+  //limits on P, in log10 days
+  limited[2].lo = 1;
+  limits[2].lo = -2.0;
+  limited[2].hi = 1;
+  limits[2].hi = 3.0;
+  gauss_pars[2].flag = 0;
+  //limits on e
+  limited[3].lo = 1;
+  limits[3].lo = 0.0;
+  limited[3].hi = 1;
+  limits[3].hi = 1;
+  gauss_pars[3].flag = 0;
+  //limits on inc, in rads
+  limited[4].lo = 1;
+  limits[4].lo = 0;
+  limited[4].hi = 1;
+  limits[4].hi = PI/2;
+  gauss_pars[4].flag = 0;
+  //limits on Omega, in rads
+  limited[5].lo = 2;
+  limits[5].lo = -PI;
+  limited[5].hi = 2;
+  limits[5].hi = PI;
+  gauss_pars[5].flag = 0;
+  //limits on omega0, in rads
+  limited[6].lo = 2;
+  limits[6].lo = -PI;
+  limited[6].hi = 2;
+  limits[6].hi = PI;
+  gauss_pars[6].flag = 0;
+  //limits on T0, in MDJ-2450000
+  limited[7].lo = 1;
+  limits[7].lo = 0.;
+  limited[7].hi = 1;
+  limits[7].hi = LC_PERIOD;
+  gauss_pars[7].flag = 0;
+  //limits on log rr1, the scale factor for R1
+  limited[8].lo = 1;
+  limits[8].lo = -3.;
+  limited[8].hi = 1;
+  limits[8].hi = 3.;
+  gauss_pars[8].flag = 1.;
+  //limits on log rr2, the scale factor for R2
+  limited[9].lo = 1;
+  limits[9].lo = -3.;
+  limited[9].hi = 1;
+  limits[9].hi = 3.;
+  gauss_pars[9].flag = 1.;
+  if (ALPHA_FREE == 1){
+    // Limits of the alpha_coefficients
+    // limits on limb darkening coefficient for star 1
+    limited[10].lo = 1;
+    limits[10].lo = 0.12;
+    limited[10].hi = 1;
+    limits[10].hi = 0.20;
+    gauss_pars[10].flag = 1;
+    // limits on gravity darkening coefficient for star 1
+    limited[11].lo = 1;
+    limits[11].lo = 0.3;
+    limited[11].hi = 1;
+    limits[11].hi = 0.38;
+    gauss_pars[11].flag = 1;
+    // limits on limb darkening coefficient for star 2
+    limited[12].lo = 1;
+    limits[12].lo = 0.12;
+    limited[12].hi = 1;
+    limits[12].hi = 0.20;
+    gauss_pars[12].flag = 1;
+    // limits on gravity darkening coefficient for star 2
+    limited[13].lo = 1;
+    limits[13].lo = 0.3;
+    limited[13].hi = 1;
+    limits[13].hi = 0.38;
+    gauss_pars[13].flag = 1;
+    // limits on reflection coefficients on star 1
+    limited[14].lo = 1;
+    limits[14].lo = 0.8;
+    limited[14].hi = 1;
+    limits[14].hi = 1.2;
+    gauss_pars[14].flag = 1;
+    // limits on reflection coefficients on star 2
+    limited[15].lo = 1;
+    limits[15].lo = 0.8;
+    limited[15].hi = 1;
+    limits[15].hi = 1.2;
+    gauss_pars[15].flag = 1;
+    if (ALPHA_MORE == 1){
+      // limits on extra (log) beaming coefficient for star 1
+      limited[16].lo = 1;
+      limits[16].lo = -0.1;
+      limited[16].hi = 1;
+      limits[16].hi = 0.1;
+      gauss_pars[16].flag = 1;
+      // limits on extra (log) beaming coefficient for star 2
+      limited[17].lo = 1;
+      limits[17].lo = -0.1;
+      limited[17].hi = 1;
+      limits[17].hi = 0.1;
+      gauss_pars[17].flag = 1;
+      // limits on (log) Teff coefficient for star 1
+      limited[18].lo = 1;
+      limits[18].lo = -3.;
+      limited[18].hi = 1;
+      limits[18].hi = 3.;
+      gauss_pars[18].flag = 1.;
+      // limits on (log) Teff coefficient for star 2
+      limited[19].lo = 1;
+      limits[19].lo = -3.;
+      limited[19].hi = 1;
+      limits[19].hi = 3.;
+      gauss_pars[19].flag = 1.;
+      if (BLENDING == 1){
+        // Blending coefficient in the flux
+        limited[20].lo = 1;
+        limits[20].lo = 0.;
+        limited[20].hi = 1;
+        limits[20].hi = 1.;
+        gauss_pars[20].flag = 0;
+        // FLux tune coefficient
+        limited[21].lo = 1;
+        limits[21].lo = 0.99;
+        limited[21].hi = 1;
+        limits[21].hi = 1.01;
+        gauss_pars[21].flag = 0;
+      }
+    }
+  }
+}
+
 //Leave commented out unless for debugging purposes
 
 /*
