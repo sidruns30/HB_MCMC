@@ -8,7 +8,8 @@
   #define MSUN 1.9885e33
   #define RSUN 6.955e10
   #define SEC_DAY 86400.0
-  #define USE_COLOR_INFO 0
+  #define USE_GMAG 1
+  #define USE_COLOR_INFO 1
   #define STORE_DATA 1
   #define ALPHA_FREE 1 // to set coefficitents as parameters in the model
   #define ALPHA_MORE 1 // to add even more flexible coefficients
@@ -83,7 +84,6 @@ void calc_light_curve(double *times, long Nt, double *pars,  double *template);
 void calc_radii_and_Teffs(double params[],  double *R1, double *R2, double *Teff1, double* Teff2);
 int RocheOverflow(double *pars);
 double loglikelihood(double time[], double lightcurve[], double noise[],
-		     long N, double params[], double mag_data[], double magerr[], 
-          int weight);
+		     long N, double params[], double mag_data[], double magerr[]);
 void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[], double LC_PERIOD);
 void initialize_proposals(double *sigma, double ***history);

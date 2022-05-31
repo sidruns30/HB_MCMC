@@ -62,7 +62,6 @@ int main(int argc, char* argv[])
 
   // Miscellaneous
   int run;
-  int weight;
   double log_LC_PERIOD;
   char prefix[100] = "";
   char suffix[100] = "";
@@ -111,6 +110,11 @@ int main(int argc, char* argv[])
   sprintf(prefix, "/scratch/ssolanski/HB_MCMC/data");
   sprintf(run_num, "_%d", run);
   strcat(suffix,RUN_ID);
+
+  if (USE_GMAG)
+  {
+    strcat(suffix, "_gmag");
+  }
   
   if (USE_COLOR_INFO)
   {
@@ -295,10 +299,9 @@ int main(int argc, char* argv[])
 
   // Read the magnitude data
   printf("Opening magnitude file");
-  if (exists(mag_name) && (USE_COLOR_INFO))
+  if (exists(mag_name) && ((USE_COLOR_INFO) || (USE_GMAG)))
   {
-    printf("Using color information \n");
-    weight = 1;
+    printf("Using color / GMAG information \n");
     mag_file = fopen(mag_name, "r");
     fscanf(mag_file, "%lf\n", &tmp1);
     mag_data[0] = tmp1;
@@ -316,7 +319,6 @@ int main(int argc, char* argv[])
   else
   {
     printf("Magnitude file not found/used; assigning infinite error to mag data \n");
-    weight = 0;
     mag_data[0] = 1000.;
     for (int i=0;i<4;i++)
     {
@@ -337,7 +339,7 @@ int main(int argc, char* argv[])
   }
 
   // Perform first likelihood evaluation
-  logLmap = loglikelihood(t_data,a_data,e_data,subN, x[0], mag_data, mag_err, weight);
+  logLmap = loglikelihood(t_data,a_data,e_data,subN, x[0], mag_data, mag_err);
   
   for(int i=0; i<NCHAINS; i++) 
   {
@@ -483,8 +485,8 @@ int main(int argc, char* argv[])
       logPy = get_logP(y, limited, limits, gauss_pars);
 
       //compute current and trial likelihood
-      logLx[chain_id] = loglikelihood(t_data, a_data, e_data, subN, x[chain_id], mag_data, mag_err, weight);
-      logLy           = loglikelihood(t_data, a_data, e_data, subN, y, mag_data, mag_err, weight);
+      logLx[chain_id] = loglikelihood(t_data, a_data, e_data, subN, x[chain_id], mag_data, mag_err);
+      logLy           = loglikelihood(t_data, a_data, e_data, subN, y, mag_data, mag_err);
 
       /* evaluate new solution */
       alpha = ran2_parallel(&seeds[j], &states[j]);

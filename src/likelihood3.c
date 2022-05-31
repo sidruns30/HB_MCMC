@@ -807,8 +807,7 @@ Parameters:
  */
 
 double loglikelihood(double time[], double lightcurve[], double noise[],
-		     long N, double params[], double mag_data[], double magerr[], 
-             int weight)
+		     long N, double params[], double mag_data[], double magerr[])
 {
   double template[N];
   double residual;
@@ -832,21 +831,32 @@ double loglikelihood(double time[], double lightcurve[], double noise[],
 
     }
 
-  if (weight != 0)
+  if (USE_COLOR_INFO || USE_GMAG)
   {
-    // Calculate magnitudes (Sets G, B-V, V-G and G-T mags)
+    // Calculate magnitudes (Sets Gmag, B-V, V-G and G-T mags)
     double D = mag_data[0];
     double Gmg, BminusV, VminusG, GminusT;
     
     calc_mags(params, D, &Gmg, &BminusV, &VminusG, &GminusT);
     double computed_mags[4] = {Gmg, BminusV, VminusG, GminusT};
-    
-    for (i=0;i<4;i++)
-    {
-        residual = (computed_mags[i] - mag_data[i+1])/magerr[i];
-        chi2 += residual*residual;
 
+    // First entry in computed mags is the Gmag 
+    if (USE_GMAG)
+    {
+        residual = (computed_mags[0] - mag_data[1])/magerr[0];
+        chi2 += residual*residual;   
     }
+
+    // The remaining entries in computed_mags are the colors
+    if (USE_COLOR_INFO)
+    {
+        for (int i=1; i<4; i++)
+        {
+            residual = (computed_mags[i] - mag_data[i+1])/magerr[i];
+            chi2 += residual*residual;
+        }
+    }
+
   }
 
   // Check for Roche Overflow
@@ -1145,7 +1155,7 @@ void initialize_proposals(double *sigma, double ***history)
   sigma[20] = 1.0e-5;   // flux tune
   
   // Use bigger sigmas if not using color info
-  if (!USE_COLOR_INFO)
+  if ((!USE_COLOR_INFO) || (!USE_GMAG))
   {
       for (int k=0; k<NPARS; k++)
       {
