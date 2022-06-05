@@ -8,8 +8,8 @@
   #define MSUN 1.9885e33
   #define RSUN 6.955e10
   #define SEC_DAY 86400.0
-  #define USE_GMAG 1
-  #define USE_COLOR_INFO 1
+  #define USE_GMAG 0
+  #define USE_COLOR_INFO 0
   #define STORE_DATA 1
   #define ALPHA_FREE 1 // to set coefficitents as parameters in the model
   #define ALPHA_MORE 1 // to add even more flexible coefficients
