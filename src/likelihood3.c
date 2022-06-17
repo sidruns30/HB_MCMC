@@ -538,7 +538,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     double e = pars[3];
     double inc = pars[4];
     double omega0 = pars[5];
-    double T0 = pars[6]*SEC_DAY;
+    double T0 = pars[6] * Pdays;
     double rr1 = pars[7];
     double rr2 = pars[8];
     double alpha_Teff_1 = 0.;
@@ -599,7 +599,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     double M1_cgs = M1 * MSUN;
     double M2_cgs = M2 * MSUN;
     double P_cgs = P;
-    double T0_cgs = T0;
+    double T0_cgs = T0 * SEC_DAY;
 
     double traj_pars[7] = {M1_cgs, M2_cgs, P_cgs, e, inc, omega0, T0_cgs};
 
@@ -1006,14 +1006,14 @@ void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[], do
   //limits on e
   limited[3].lo = 1;
   limits[3].lo = 0.0;
-  limited[3].hi = 1;
+  limited[3].hi = 0.99;
   limits[3].hi = 1;
   gauss_pars[3].flag = 0;
   //limits on inc, in rads
   limited[4].lo = 1;
   limits[4].lo = 0;
   limited[4].hi = 1;
-  limits[4].hi = PI/2;
+  limits[4].hi = PI;
   gauss_pars[4].flag = 0;
   //limits on omega0, in rads
   limited[5].lo = 2;
@@ -1025,7 +1025,7 @@ void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[], do
   limited[6].lo = 1;
   limits[6].lo = 0.;
   limited[6].hi = 1;
-  limits[6].hi = LC_PERIOD;
+  limits[6].hi = (2.* PI);
   gauss_pars[6].flag = 0;
   //limits on log rr1, the scale factor for R1
   limited[7].lo = 1;
@@ -1138,7 +1138,7 @@ void initialize_proposals(double *sigma, double ***history)
 	sigma[3]  = 1.0e-2;  //e
 	sigma[4]  = 1.0e-3;  //inc (rad)
 	sigma[5]  = 1.0e-3;  //omega0 (rad)
-	sigma[6]  = 1.0e-5;  //T0 (day)
+	sigma[6]  = 1.0e-3;  //T0 (day)
 	sigma[7]  = 1.0e-1;  //log rr1 normalization
 	sigma[8]  = 1.0e-1;  //log rr2 normalization
   sigma[9] = 1.0e-2;   // mu 1
