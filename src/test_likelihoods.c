@@ -21,6 +21,56 @@ int main(int argc, char* argv[])
     set_limits(limited, limits, gauss_pars, LC_DURATION);
     set_limits_old(limited_old, limits_old, gauss_pars_old, LC_DURATION);
 
+    double times[1000];
+    double RR[1000], PHI[1000], Z1[1000], Z2[1000], DD[1000];
+
+    for (int i=0; i<1000; i++)
+    {
+        times[i] = 4 * ((double)i/1000);
+    }
+
+
+    double pars[21] = {0.300918167925, 0.201073240382, 0.315687018, 0.226228332961, 1.43483081695, 2.39254328279,
+1.53065288845, -2.45048204944, -0.0111151536831, 0.17004110046, 0.334086604211, 0.155971855936,
+0.339246868468, 0.94581378228, 0.824791381832, -0.0140470354976, -0.0368550857758, 0.41323817757,
+0.547024296055, 0.308828039741, 1.00029951763};
+
+    // Extract the paramters
+    double logM1 = pars[0];
+    double logM2 = pars[1];
+    // Period in seconds
+    double P = pow(10., pars[2])*SEC_DAY;
+    double Pdays = pow(10., pars[2]);
+    double e = pars[3];
+    double inc = pars[4];
+    double omega0 = pars[5];
+    double T0 = pars[6]*SEC_DAY;
+    double rr1 = pars[7];
+    double rr2 = pars[8];
+    double M1 = pow(10., logM1);
+    double M2 = pow(10., logM2);
+
+    
+    // Parameters for the trajectory function
+    double M1_cgs = M1 * MSUN;
+    double M2_cgs = M2 * MSUN;
+    double P_cgs = P;
+    double T0_cgs = T0;
+
+    double traj_pars[7] = {M1_cgs, M2_cgs, P_cgs, e, inc, omega0, T0_cgs};
+
+
+    traj(times, traj_pars, DD, Z1, Z2, RR, PHI, 1000);
+
+    FILE *traj_file = fopen("trajectories.txt", "w");
+
+    for (int i=0; i<1000; i++)
+    {
+        fprintf(traj_file, "%f\t%f\t%f\t%f\t%f\n", RR[i], PHI[i], DD[i], Z1[i], Z2[i]);
+    } 
+
+    fclose(traj_file);
+    /*
     FILE *comparision;
     FILE *lc_generated;
     char *fname = "comparision.txt";
@@ -131,7 +181,7 @@ int main(int argc, char* argv[])
         
         fclose(lc_generated);
         */
-    }
+    //}
 
     /*
     for (int test_id=0; test_id<100; test_id++)
@@ -185,7 +235,7 @@ int main(int argc, char* argv[])
 
     }
     */
-    fclose(comparision);
+    //fclose(comparision);
     return 0;
 }
 

@@ -234,12 +234,15 @@ def main():
                             skip_samples=skip_samples)
 
     colors_list = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    legends_list = ["TIC_%s_OMP_%s_GMAG_%s_COLOR_%s_ID_%d" % (str(lc_id), str(omp), str(gmag), str(color), run_id) for run_id in run_ids]
     CORNER_KWARGS = set_corner_kwargs(samples_list)
 
     for i, samples in enumerate(samples_list):
         fig = plot_corner(samples, labels, CORNER_KWARGS)
         CORNER_KWARGS.update(fig=fig)
         CORNER_KWARGS.update(color=colors_list[i])
+        CORNER_KWARGS.update(legend=legends_list[i])
+        fig.gca().legend()
 
     plot_name = "../extra/corner_%s" % lc_id
     if gmag: plot_name += "_gmag"
@@ -248,7 +251,7 @@ def main():
     if orbital: plot_name += "_orbital"
     plot_name += "_all.png"
 
-    plt.savefig(plot_name, dpi=300)
+    plt.savefig(plot_name, dpi=100)
 
 if __name__ == "__main__":
     main()
