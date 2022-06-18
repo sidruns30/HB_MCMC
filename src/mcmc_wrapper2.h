@@ -13,16 +13,12 @@
 #define GAMMA (2.388/sqrt(2.*NPARS))
 #define NUM_ELEMENTS(x) (size_of(x)/size_of(x[0]))
 #define USE_RAND_PARS 1
-#define USE_COLOR_INFO 0
 #define ENABLE_OPENMP 1
-#define STORE_DATA 1
 
 /* From likelihood.c */
 void calc_light_curve(double t_data[], long Nt, double P_[], double light_curve[]);
 /* MCMC functions*/
-void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[], double lc_period);
-void initialize_proposals(double *sigma, double ***history);
-  void ptmcmc(int *index, double temp[], double logL[], double logP[], FILE *temp_swap_file);
+void ptmcmc(int *index, double temp[], double logL[], double logP[], FILE *temp_swap_file);
 double get_logP(double pars[], bounds limited[], bounds limits[], gauss_bounds gauss_pars[]);
 /* Proposal distributions for MCMC */
 double ran2(long *idum);
