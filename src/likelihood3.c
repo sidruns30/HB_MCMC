@@ -1006,8 +1006,8 @@ void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[], do
   //limits on e
   limited[3].lo = 1;
   limits[3].lo = 0.0;
-  limited[3].hi = 0.99;
-  limits[3].hi = 1;
+  limited[3].hi = 1;
+  limits[3].hi = 1.;
   gauss_pars[3].flag = 0;
   //limits on inc, in rads
   limited[4].lo = 1;
