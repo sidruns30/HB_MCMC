@@ -538,7 +538,7 @@ void calc_light_curve(double *times, long Nt, double *pars, double *template){
     double e = pars[3];
     double inc = pars[4];
     double omega0 = pars[5];
-    double T0 = pars[6] * Pdays;
+    double T0 = pars[6];
     double rr1 = pars[7];
     double rr2 = pars[8];
     double alpha_Teff_1 = 0.;
@@ -1025,19 +1025,19 @@ void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[], do
   limited[6].lo = 1;
   limits[6].lo = 0.;
   limited[6].hi = 1;
-  limits[6].hi = (2.* PI);
+  limits[6].hi = LC_PERIOD;
   gauss_pars[6].flag = 0;
   //limits on log rr1, the scale factor for R1
   limited[7].lo = 1;
-  limits[7].lo = -3.;
+  limits[7].lo = -5.;
   limited[7].hi = 1;
-  limits[7].hi = 3.;
+  limits[7].hi = 5.;
   gauss_pars[7].flag = 1.;
   //limits on log rr2, the scale factor for R2
   limited[8].lo = 1;
-  limits[8].lo = -3.;
+  limits[8].lo = -5.;
   limited[8].hi = 1;
-  limits[8].hi = 3.;
+  limits[8].hi = 5.;
   gauss_pars[8].flag = 1.;
   if (ALPHA_FREE == 1){
     // Limits of the alpha_coefficients
@@ -1067,40 +1067,40 @@ void set_limits(bounds limited[], bounds limits[], gauss_bounds gauss_pars[], do
     gauss_pars[12].flag = 1;
     // limits on reflection coefficients on star 1
     limited[13].lo = 1;
-    limits[13].lo = 0.8;
+    limits[13].lo = 0.5;
     limited[13].hi = 1;
-    limits[13].hi = 1.2;
+    limits[13].hi = 1.5;
     gauss_pars[13].flag = 1;
     // limits on reflection coefficients on star 2
     limited[14].lo = 1;
-    limits[14].lo = 0.8;
+    limits[14].lo = 0.5;
     limited[14].hi = 1;
-    limits[14].hi = 1.2;
+    limits[14].hi = 1.5;
     gauss_pars[14].flag = 1;
     if (ALPHA_MORE == 1){
       // limits on extra (log) beaming coefficient for star 1
       limited[15].lo = 1;
-      limits[15].lo = -0.1;
+      limits[15].lo = -0.3;
       limited[15].hi = 1;
-      limits[15].hi = 0.1;
+      limits[15].hi = 0.3;
       gauss_pars[15].flag = 1;
       // limits on extra (log) beaming coefficient for star 2
       limited[16].lo = 1;
-      limits[16].lo = -0.1;
+      limits[16].lo = -0.3;
       limited[16].hi = 1;
-      limits[16].hi = 0.1;
+      limits[16].hi = 0.3;
       gauss_pars[16].flag = 1;
       // limits on (log) Teff coefficient for star 1
       limited[17].lo = 1;
-      limits[17].lo = -3.;
+      limits[17].lo = -5.;
       limited[17].hi = 1;
-      limits[17].hi = 3.;
+      limits[17].hi = 5.;
       gauss_pars[17].flag = 1.;
       // limits on (log) Teff coefficient for star 2
       limited[18].lo = 1;
-      limits[18].lo = -3.;
+      limits[18].lo = -5.;
       limited[18].hi = 1;
-      limits[18].hi = 3.;
+      limits[18].hi = 5.;
       gauss_pars[18].flag = 1.;
       if (BLENDING == 1){
         // Blending coefficient in the flux

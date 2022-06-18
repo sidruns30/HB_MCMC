@@ -590,7 +590,7 @@ int main(int argc, char* argv[])
 
     atrial++;
 
-    if((iter%1000==0) && (STORE_DATA)) 
+    if((iter%100==0) && (STORE_DATA)) 
     {
       //print parameter chains
       fprintf(chain_file,"%ld %.12g ",iter/10,logLx[index[0]]);
@@ -707,10 +707,57 @@ double get_logP(double pars[], bounds limited[], bounds limits[], gauss_bounds g
   double sigma;
   for (int i=0; i<NPARS; i++)
   {
+    // radial rescaling factors
+    if (i == 7 || i == 8)
+    {
+      mean = 0.;
+      sigma = 1.;
+    }
+
+    // limb darkening coefficients
+    else if (i == 9 || i ==  11)
+    {
+      mean = 0.16;
+      sigma = 0.04;
+    }
+
+    // gravity darkening coefficients
+    else if (i == 10 || i == 12)
+    {
+      mean = 0.34;
+      sigma = 0.04;
+    }
+
+    // reflection coefficients
+    else if (i == 13 || i == 14)
+    {
+      mean = 1.;
+      sigma = 0.2;
+    }
+
+    // beaming coefficients
+    else if (i == 15 || i == 16)
+    {
+      mean = 0.;
+      sigma = 0.1;
+    }
+
+    // temperature coefficients
+    else if (i == 17 || i == 18)
+    {
+      mean = 0.;
+      sigma = 1.;
+    }
+
+    // flat prior
+    else
+    {
+      mean = 0.;
+      sigma = BIG_NUM;
+    }
+
     if (gauss_pars[i].flag == 1)
     {
-      mean = 0.5 * (limits[i].lo + limits[i].hi);
-      sigma = (limits[i].hi - limits[i].lo) / 3.;
       logP += log(gaussian(pars[i], mean, sigma));
     }
   }
@@ -1127,7 +1174,7 @@ int exists(const char *fname){
 // Standard gaussian
 double gaussian(double x, double mean, double sigma)
 {
-  return (1 / sigma / SQRT_2PI) * exp(- pow((x - mean) / sigma, 2.));
+  return (1 / sigma / SQRT_2PI) * exp(- pow((x - mean) / sigma, 2.) / 2.);
 }
 
 /*

@@ -1,6 +1,6 @@
 import corner
 import numpy as np
-import sys, os
+import sys, os, glob
 import matplotlib.pyplot as plt
 
 
@@ -123,7 +123,7 @@ returns:
     labels: the respective labels of the chain data
 """
 
-def load_chain_dat(lc_id, run_id=0, skip_samples=1000, gmag=False, color=False, omp=True, orbital=False):
+def load_chain_dat(lc_id, run_id=0, skip_samples=1000, gmag=False, color=False, omp=True, orbital=False, **kwargs):
     chain_loc = "/scratch/ssolanski/HB_MCMC/data/chains/"
     chain_loc += "chain.%s" % lc_id
     if gmag: chain_loc += "_gmag"
@@ -148,6 +148,28 @@ def load_chain_dat(lc_id, run_id=0, skip_samples=1000, gmag=False, color=False, 
 
     return samples, labels
 
+"""
+Load and return an external chain; does not return any labels on the chain
+"""
+def load_custom_chain(orbital, chain_path):
+    data = np.genfromtxt(chain_path, skip_header=10)
+    print(data.shape)
+    # shape for John's samples
+    if data.shape[1] == 23:
+        data = data[:, 1:-1]
+        print(data[-1, :])
+    elif data.shape[1] == 27:
+        data = data[:, 4:-2]
+        print(data[-1, :])
+    else:
+        print("Incorrect data shape: ", data.shape)
+
+    if orbital:
+        data, labels = generate_relevant_samples(data)
+        return data
+    else:
+        return data[:, 1:]
+
 
 """
 Collect all the chain data in one list
@@ -166,6 +188,9 @@ def load_all_data(lc_id, run_ids=[0], **kwargs):
         #    kwargs["gmag"] = gmag
         samples, labels = load_chain_dat(lc_id=lc_id, run_id=index, **kwargs)
         samples_list.append(samples)
+    if "chain_file_locs" in kwargs:
+        for loc in kwargs["chain_file_locs"]:
+            samples_list.append(load_custom_chain(chain_path=loc,orbital=kwargs["orbital"]))
     return samples_list, labels
 
 """
@@ -225,16 +250,21 @@ def main():
     gmag = False
     color = False
     omp = True
-    orbital = True
+    orbital = False
     skip_samples = 1000
 
+    if gmag:
+        chain_file_locs = glob.glob("/scratch/ssolanski/HB_MCMC/data/chains/237753600_cmag*")
+    else:
+        chain_file_locs = glob.glob("/scratch/ssolanski/HB_MCMC/data/chains/237753600_std**")
 
     samples_list, labels = load_all_data(lc_id, run_ids, 
                             gmag=gmag, color=color, omp=omp, orbital=orbital,
-                            skip_samples=skip_samples)
+                            skip_samples=skip_samples, chain_file_locs=chain_file_locs)
 
     colors_list = plt.rcParams['axes.prop_cycle'].by_key()['color']
     legends_list = ["TIC_%s_OMP_%s_GMAG_%s_COLOR_%s_ID_%d" % (str(lc_id), str(omp), str(gmag), str(color), run_id) for run_id in run_ids]
+    for loc in chain_file_locs: legends_list.append(loc)
     CORNER_KWARGS = set_corner_kwargs(samples_list)
 
     for i, samples in enumerate(samples_list):
